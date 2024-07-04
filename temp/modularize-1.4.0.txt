@@ -1,0 +1,114 @@
+To modularize the provided PowerShell script, you can break down the repetitive tasks into reusable functions. This will make the code more maintainable and readable. Here’s a suggested modularization:
+
+1. **Create a function to handle feedback and response processing.**
+2. **Create a function to save and update the code file.**
+3. **Refactor the main script to use these functions.**
+
+Here’s how you can do it:
+
+### Step 1: Define Functions
+
+```powershell
+function Get-FeedbackPrompt {
+    param (
+        [string]$description,
+        [string]$code
+    )
+    return @"
+Review the following responses:
+
+1. Description and objectives:
+    ````````text
+    $($description.trim())
+    ````````
+
+2. The code:
+    ``````powershell
+    $code
+    ``````
+
+Think step by step, make sure your answer is unbiased, show the review. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks. Provide your suggestions for improvement as feedback to Powershell Developer. Generate a list of verification questions that could help to self-analyze. I will tip you `$100 when your suggestions are consistent with the project description and objectives. 
+"@
+}
+
+function Process-FeedbackAndResponse {
+    param (
+        [object]$role,
+        [string]$description,
+        [string]$code,
+        [string]$tipAmount,
+        [ref]$globalResponse,
+        [ref]$lastCode,
+        [ref]$fileVersion,
+        [string]$teamDiscussionDataFolder
+    )
+
+    $feedbackPrompt = Get-FeedbackPrompt -description $description -code $code
+    $feedback = $role.Feedback($powerShellDeveloper, $feedbackPrompt)
+    Add-ToGlobalResponses $feedback
+
+    $response = $powerShellDeveloper.ProcessInput("Based on $($role.Name) feedback, modify the code with suggested improvements and optimizations. The previous version of the code has been shared below after the feedback block.`n`n````````text`n" + $($role.GetLastMemory().Response) + "`n`````````n`nHere is previous version of the code:`n`n``````powershell`n$code`n```````n`nThink step by step. Make sure your answer is unbiased. I will tip you `$tipAmount for the correct code. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks.")
+
+    if ($response) {
+        $globalResponse.Value += $response
+        Add-ToGlobalResponses $response
+        $_savedFile = Export-AndWritePowerShellCodeBlocks -InputString $response -OutputFilePath $(join-path $teamDiscussionDataFolder "TheCode_v$($fileVersion.Value).ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
+        $lastCode.Value = get-content -Path $_savedFile -raw 
+        $fileVersion.Value += 1
+        write-verbose $_savedFile
+    }
+}
+
+function Save-AndUpdateCode {
+    param (
+        [string]$response,
+        [ref]$lastCode,
+        [ref]$fileVersion,
+        [string]$teamDiscussionDataFolder
+    )
+
+    $_savedFile = Export-AndWritePowerShellCodeBlocks -InputString $response -OutputFilePath $(join-path $teamDiscussionDataFolder "TheCode_v$($fileVersion.Value).ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
+    $lastCode.Value = get-content -Path $_savedFile -raw 
+    $fileVersion.Value += 1
+    write-verbose $_savedFile
+}
+```
+
+### Step 2: Refactor Main Script
+
+```powershell
+#region PM-PSDev
+$userInputOryginal = $userInput
+$projectManagerFeedback = $projectManager.Feedback($powerShellDeveloper, "Based on user input you must create detailed and concise project name, description, objectives, deliverables, additional considerations, and success criteria only. User will tip you `$100 for including all the elements provided by the user.`n`n````````text`n" + $userInputOryginal + "`n`````````n`n")
+Add-ToGlobalResponses $projectManagerFeedback
+$script:userInput = $projectManagerFeedback
+$powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput("Based on $($projectManager.Name) review, you must create the first version of the code.`n`n````````text`n$($script:userInput)`n`````````n`nUse reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks. I will tip you `$50 for showing the code.")
+$GlobalPSDevResponse += $powerShellDeveloperResponce
+Add-ToGlobalResponses $powerShellDeveloperResponce
+Save-AndUpdateCode -response $powerShellDeveloperResponce -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $script:TeamDiscussionDataFolder
+#endregion PM-PSDev
+
+#region RA-PSDev
+Process-FeedbackAndResponse -role $requirementsAnalyst -description $script:userInput -code $lastPSDevCode -tipAmount 100 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $script:TeamDiscussionDataFolder
+#endregion RA-PSDev
+
+#region SA-PSDev
+Process-FeedbackAndResponse -role $systemArchitect -description $script:userInput -code $lastPSDevCode -tipAmount 150 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $script:TeamDiscussionDataFolder
+#endregion SA-PSDev
+
+#region DE-PSDev
+Process-FeedbackAndResponse -role $domainExpert -description $script:userInput -code $lastPSDevCode -tipAmount 200 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $script:TeamDiscussionDataFolder
+#endregion DE-PSDev
+
+#region QAE-PSDev
+Process-FeedbackAndResponse -role $qaEngineer -description $script:userInput -code $lastPSDevCode -tipAmount 300 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $script:TeamDiscussionDataFolder
+#endregion QAE-PSDev
+```
+
+### Explanation:
+
+1. **`Get-FeedbackPrompt`**: Generates the feedback prompt string.
+2. **`Process-FeedbackAndResponse`**: Handles the feedback and response processing for each role.
+3. **`Save-AndUpdateCode`**: Saves the response to a file and updates the last code and file version.
+
+By using these functions, the main script becomes much cleaner and easier to maintain. Each role's feedback and response processing is handled by the `Process-FeedbackAndResponse` function, reducing redundancy and improving readability.
