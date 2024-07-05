@@ -127,7 +127,7 @@ For more information on the AI models and services used in this script, please r
 5. **Generate System Report**:
 
    ```powershell
-   "Generate a detailed system report including CPU, RAM, and disk usage." | AIPSTeam.ps1 -LogFolder "C:\SystemReports"
+   "Script for reporting CPU, RAM, and disk usage." | AIPSTeam.ps1 -LogFolder "C:\SystemReports"
    ```
 
    **Description**: This example generates a comprehensive system report that includes details about CPU, RAM, and disk usage. The report is saved in the specified log folder `C:\SystemReports`.
