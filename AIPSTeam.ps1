@@ -6,7 +6,7 @@
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer
 .RELEASENOTES
-2.1.1: move to new repository, new projecturi.
+2.1.1: move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
 2.0.1: add abstract layer for LLM providers, fix update of lastPSDevCode, ann NOTips, Updated error handling, Added VerbosePrompt switch.
 1.6.2: fix double feedback display. 
 1.6.1: fix stream in feedback. 
@@ -131,7 +131,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "2.0.1"
+$AIPSTeamVersion = "2.1.1"
 
 #region ProjectTeamClass
 <#
@@ -1583,10 +1583,25 @@ else {
 Show-Banner
 $scriptname = "AIPSTeam"
 if ($LoadProjectStatus) {
-    # Load the project status from the specified file
+    # Check if the provided path is a directory
+    if (Test-Path -Path $LoadProjectStatus -PathType Container) {
+        # Get all XML files in the specified directory
+        $xmlFiles = Get-ChildItem -Path $LoadProjectStatus -Filter *.xml
+        foreach ($file in $xmlFiles) {
+            # Prompt the user to select a file to use as the project status
+            $useFile = Read-Host "Do you want to use the file '$($file.FullName)' as the project status? (yes/no)"
+            if ($useFile -eq 'yes') {
+                # Set the selected file as the project status file
+                $LoadProjectStatus = $file.FullName
+                break
+            }
+        }
+    } 
     try {
+        # Load the project state from the specified file
         $GlobalState = Get-ProjectState -FilePath $LoadProjectStatus
         Write-Information "++ Project state loaded successfully from $LoadProjectStatus" -InformationAction Continue
+        # Output verbose information about the loaded project state
         Write-Verbose "`$GlobalState.TeamDiscussionDataFolder: $($GlobalState.TeamDiscussionDataFolder)"
         Write-Verbose "`$GlobalState.FileVersion: $($GlobalState.FileVersion)"
         Write-Verbose "`$GlobalState.LastPSDevCode: $($GlobalState.LastPSDevCode)"
@@ -1597,31 +1612,36 @@ if ($LoadProjectStatus) {
         Write-Verbose "`$GlobalState.LogFolder: $($GlobalState.LogFolder)"
     }    
     catch [System.Exception] {
+        # Handle any exceptions that occur during the loading of the project state
         Update-ErrorHandling -ErrorRecord $_ -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
     }
 }
 else {
     Try {
-        # Get the current date and time
+        # Get the current date and time in the specified format
         $currentDateTime = Get-Date -Format "yyyyMMdd_HHmmss"
         if (-not [string]::IsNullOrEmpty($GlobalState.LogFolder)) {
-            # Create a folder with the current date and time as the name in the example path
+            # Create a folder with the current date and time as the name in the specified log folder path
             $GlobalState.TeamDiscussionDataFolder = New-FolderAtPath -Path $GlobalState.LogFolder -FolderName $currentDateTime
         }
         else {
+            # Set the log folder path to the user's Documents folder with the script name as a subfolder
             $GlobalState.LogFolder = Join-Path -Path ([Environment]::GetFolderPath("MyDocuments")) -ChildPath $scriptname
             if (-not (Test-Path -Path $GlobalState.LogFolder)) {
+                # Create the log folder if it does not exist
                 New-Item -ItemType Directory -Path $GlobalState.LogFolder | Out-Null
             }
             Write-Information "++ The logs will be saved in the following folder: $($GlobalState.LogFolder)" -InformationAction Continue
-            # Create a folder with the current date and time as the name in the example path
+            # Create a folder with the current date and time as the name in the log folder path
             $GlobalState.TeamDiscussionDataFolder = New-FolderAtPath -Path $GlobalState.LogFolder -FolderName $currentDateTime
         }
         if ($GlobalState.TeamDiscussionDataFolder) {
+            # Output information about the created team discussion folder
             Write-Information "++ Team discussion folder was created '$($GlobalState.TeamDiscussionDataFolder)'" -InformationAction Continue
         }
     }
     Catch {
+        # Handle any exceptions that occur during the creation of the discussion folder
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "Create discussion folder" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
 
         return $false
@@ -2158,7 +2178,7 @@ do {
                         }
                     }
                     else {
-                        $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($lastPSDevCode)
+                        $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode)
                         $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
                         Write-Information "++ Documentation generated and saved to $DocumentationFullName" -InformationAction Continue
                     }
