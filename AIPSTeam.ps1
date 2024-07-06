@@ -1,11 +1,12 @@
 <#PSScriptInfo
-.VERSION 2.1.1
+.VERSION 2.1.2
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer
 .RELEASENOTES
+2.1.2: minor fixes.
 2.1.1: move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
 2.0.1: add abstract layer for LLM providers, fix update of lastPSDevCode, ann NOTips, Updated error handling, Added VerbosePrompt switch.
 1.6.2: fix double feedback display. 
@@ -31,11 +32,10 @@
 
 <# 
 .SYNOPSIS 
-This script emulates a team of specialists working together on a PowerShell project.
+This script emulates a team of AI-powered specialists working together on a PowerShell project.
 
 .DESCRIPTION 
-The script simulates a team of specialists, each with a unique role in executing a project. The user input is processed by one specialist who performs their task and passes the result to the next specialist. This process continues until all tasks are completed.
-
+The script simulates a team of AI-powered specialists, each with a unique role in executing a project. The user input is processed by one AI specialist who performs their task and passes the result to the next AI specialist. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
 .PARAMETER userInput 
 Defines the project outline as a string. Default is to monitor RAM usage and show a color block based on the load. This parameter can also accept input from the pipeline.
 
@@ -84,14 +84,14 @@ PS> "A PowerShell project to monitor CPU usage and display dynamic graph." | .\A
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 2.1.1
+Version: 2.1.2
 Author: voytas75
 Creation Date: 05.2024
 Purpose/Change: Initial release for emulating teamwork within PowerShell scripting context, rest in PSScriptInfo Releasenotes.
 
 .LINK
 https://www.powershellgallery.com/packages/AIPSTeam
-https://github.com/voytas75/AzureOpenAI-PowerShell/tree/master/AIPSTeam/README.md
+https://github.com/voytas75/AIPSTeam/README.md
 #>
 param(
     [Parameter(Mandatory = $false, ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string. Default is to monitor RAM usage and show a color block based on the load.")]
@@ -131,7 +131,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "2.1.1"
+$AIPSTeamVersion = "2.1.2"
 
 #region ProjectTeamClass
 <#
@@ -613,8 +613,7 @@ function Show-Banner {
    AI PowerShell Team                                     powered by PSAOAI Module
                                                                      Ollama
                                                                      LM Studio
-         
-       https://github.com/voytas75/AzureOpenAI-PowerShell/tree/master/AIPSTeam
+   https://github.com/voytas75/AIPSTeam
   
 '@
     Write-Host @"
