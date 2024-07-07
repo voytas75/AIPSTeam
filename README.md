@@ -2,6 +2,8 @@
 
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AIPSTeam)](https://www.powershellgallery.com/packages/AIPSTeam)
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/A0A6KYBUS)
+
 ## Table of Contents
 
 - [AI PowerShell Team Script](#ai-powershell-team-script)
