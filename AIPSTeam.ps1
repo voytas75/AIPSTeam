@@ -1,12 +1,12 @@
 <#PSScriptInfo
-.VERSION 2.1.2
+.VERSION 3.0.1
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer
 .RELEASENOTES
-2.1.3[unpublished]: 
+3.0.1[unpublished]: implement RAG based on Bing Web search API, add method to class.
 2.1.2: minor fixes.
 2.1.1: move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
 2.0.1: add abstract layer for LLM providers, fix update of lastPSDevCode, ann NOTips, Updated error handling, Added VerbosePrompt switch.
@@ -85,7 +85,7 @@ PS> "A PowerShell project to monitor CPU usage and display dynamic graph." | .\A
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 2.1.2
+Version: 3.0.1
 Author: voytas75
 Creation Date: 05.2024
 Purpose/Change: Initial release for emulating teamwork within PowerShell scripting context, rest in PSScriptInfo Releasenotes.
@@ -95,8 +95,8 @@ https://www.powershellgallery.com/packages/AIPSTeam
 https://github.com/voytas75/AIPSTeam/README.md
 #>
 param(
-    [Parameter(Mandatory = $false, ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string. Default is to monitor RAM usage and show a color block based on the load.")]
-    [string] $userInput = "Monitor RAM usage and show a single color block based on the load.",
+    [Parameter(Mandatory = $false, ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string.")]
+    [string] $userInput = $(if ($null -eq $userInput) { Read-Host "Please provide the project outline" }),
 
     [Parameter(Mandatory = $false, HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
     [bool] $Stream = $true,
@@ -130,9 +130,12 @@ param(
 
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
-    [string]$LLMProvider = "AzureOpenAI"
+    [string]$LLMProvider = "AzureOpenAI",
+
+    [Parameter(Mandatory = $false, HelpMessage = "Enables the RAG (Retrieve and Generate) functionality.")]
+    [switch] $RAG
 )
-$AIPSTeamVersion = "2.1.2"
+$AIPSTeamVersion = "3.0.1"
 
 #region ProjectTeamClass
 <#
@@ -291,6 +294,69 @@ class ProjectTeam {
         }
     }
 
+    [string] ProcessInput([string] $userinput, [string] $systemprompt) {
+        Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
+        
+        # Log the input
+        $this.AddLogEntry("Processing input:`n$userinput")
+        
+        # Update status
+        $this.Status = "In Progress"
+        
+        try {
+            # Ensure ResponseMemory is initialized
+            if ($null -eq $this.ResponseMemory) {
+                $this.ResponseMemory = @()
+                $this.AddLogEntry("Initialized ResponseMemory")
+            }
+            
+            # Use the user-provided function to get the response
+            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+
+            if (-not $script:Stream) {
+                Write-Host $response
+            }
+            
+            # Log the response
+            $this.AddLogEntry("Generated response:`n$response")
+            
+            # Store the response in memory with timestamp
+            $this.ResponseMemory.Add([PSCustomObject]@{
+                Response  = $response
+                Timestamp = Get-Date
+            })
+            
+            $feedbackSummary = ""
+            if ($this.FeedbackTeam.count -gt 0) {
+                # Request feedback for the response
+                $feedbackSummary = $this.RequestFeedback($response)
+                # Log the feedback summary
+                $this.AddLogEntry("Feedback summary:`n$feedbackSummary")
+            }
+            
+            # Integrate feedback into response
+            $responseWithFeedback = "$response`n`n$feedbackSummary"
+            
+            # Update status
+            $this.Status = "Completed"
+        }
+        catch {
+            # Log the error
+            $this.AddLogEntry("Error:`n$_")
+            # Update status
+            $this.Status = "Error"
+            throw $_
+        }
+
+        # Pass to the next expert if available
+        if ($null -ne $this.NextExpert) {
+            return $this.NextExpert.ProcessInput($responseWithFeedback)
+        }
+        else {
+            return $responseWithFeedback
+        }
+    }
+    
     [string] Feedback([ProjectTeam] $AssessedExpert, [string] $Expertinput) {
         Show-Header -HeaderText "Feedback by $($this.Name) ($($this.Role)) for $($AssessedExpert.name)"
         
@@ -1554,6 +1620,96 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
 
     return $response.Choices[0].message.content
 }
+
+
+function Invoke-BingWebSearch {
+    param (
+        [string]$query,  # The search query
+        [string]$apiKey = $env:BINGAPIKEY,  # The API key for Bing Search API
+        [string]$endpoint = "https://api.bing.microsoft.com/v7.0/search",  # The endpoint for Bing Search API
+        [string]$language = "en-US",  # The language for the search results
+        [int]$count = 1  # The number of search results to return
+    )
+
+    # Define the headers for the API request
+    $headers = @{
+        "Ocp-Apim-Subscription-Key" = $apiKey
+    }
+
+    # Define the parameters for the API request
+    $params = @{
+        "q" = $query
+        "mkt" = $language
+        "count" = $count
+    }
+
+    try {
+        # Make the API request to Bing Search
+        $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -Body $params
+
+        # Check if the response contains web pages
+        if ($null -eq $response.webPages.value) {
+            Write-Warning "No web pages found for the query: $query"
+            return $null
+        }
+
+        # Return the search results
+        return $response.webPages.value
+    }
+    catch [System.Net.WebException] {
+        # Handle web exceptions (e.g., network issues)
+        Write-Warning "Network error occurred during Bing search: $_"
+        #return $null
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        Throw $_
+    }
+    catch [System.Exception] {
+        # Handle all other exceptions
+        Write-Warning "An error occurred during Bing search: $_"
+        #return $null
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        Throw $_
+    }
+}
+
+function Invoke-RAG {
+    param (
+        [string]$userInput,
+        [string]$prompt
+    )
+
+    try {
+        # Perform a web search using Bing with the user input and limit the results to 2
+        $webResults = Invoke-BingWebSearch -query $userInput -count 2
+        $RAGresponse = $null
+
+        # Check if web results are returned
+        if ($webResults) {
+            # Extract and clean text content from the web results
+            $webResultsText = ($webResults | ForEach-Object {
+                $htmlContent = Invoke-WebRequest -Uri $_.url
+                $textContent = ($htmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText -replace '(?m)^\s*$',''
+                $textContent
+            }) -join "`n`n"
+        }
+
+        # Process the cleaned web results text with the project manager's input processing function
+        $RAGresponse = $projectManager.ProcessInput($webResultsText, $prompt)
+        
+        # Return the response generated by the project manager
+        return $RAGresponse
+    }
+    catch {
+        # Log the error and rethrow it
+        #$this.AddLogEntry("Error in Invoke-RAG:`n$_")
+        #throw $_
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        Throw $_
+    }
+}
 #endregion Functions
 
 #region Setting Up
@@ -1906,6 +2062,22 @@ if (-not $NOLog) {
     Start-Transcript -Path (join-path $GlobalState.TeamDiscussionDataFolder "TRANSCRIPT.log") -Append
 }
 
+$RAGpromptAddon = $null
+if ($RAG) {
+    $RAGresponse = Invoke-RAG -userInput $userInput -prompt "The assistant must analyze the provided text through the prism of the description provided by the user: '$userInput' and present a list of key information, thoughts and questions."
+    $RAGpromptAddon = @"
+
+###RAG data###
+
+````````text
+$RAGresponse
+````````
+    
+"@
+}
+
+
+
 if (-not $LoadProjectStatus) {
     #region PM-PSDev
     $examplePScode = @'
@@ -1924,13 +2096,14 @@ Write the powershell code based on review. Everything except the code must be co
     $userInputOryginal = $userInput
     $GlobalState.OrgUserInput = $userInputOryginal
     $projectManagerPrompt = @"
-Write detailed and concise PowerShell project name, description, objectives, deliverables, additional considerations, and success criteria based on user input.
+Write detailed and concise PowerShell project name, description, objectives, deliverables, additional considerations, and success criteria based on user input and RAG data.
 
 ###User input###
 
 ````````text
 $userInputOryginal
 ````````
+$RAGpromptAddon
 "@
     if (-not $NOTips) {
         $projectManagerPrompt += "`n`nNote: There is `$50 tip for this task."
@@ -1960,7 +2133,7 @@ $examplePScode
     Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
     Save-AndUpdateCode -response $powerShellDeveloperResponce -GlobalState $GlobalState
     #endregion PM-PSDev
-    
+    return
     #region RA-PSDev
     #Invoke-ProcessFeedbackAndResponse -role $requirementsAnalyst -description $GlobalState.userInput -code $lastPSDevCode -tipAmount 100 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $GlobalState.TeamDiscussionDataFolder
     if ($NOTips) {
