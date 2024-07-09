@@ -245,14 +245,24 @@ class ProjectTeam {
         # Update status
         $this.Status = "In Progress"
         #write-Host $script:Stream
+        $response = ""
         try {
             Write-verbose $script:MaxTokens
 
             #Write-Host $userinput -ForegroundColor Cyan
             # Use the user-provided function to get the response
             #$response = & $this.ResponseFunction -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens
-            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
- 
+            $loopCount = 0
+            $maxLoops = 5
+            do {
+                $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+                if (-not [string]::IsNullOrEmpty($response)) {
+                    break
+                }
+                Start-Sleep -Seconds 10
+                $loopCount++
+            } while ($loopCount -lt $maxLoops)
+
             if (-not $script:GlobalState.Stream) {
                 #write-host ($response | convertto-json -Depth 100)
                 Write-Host $response
@@ -302,7 +312,7 @@ class ProjectTeam {
         
         # Update status
         $this.Status = "In Progress"
-        
+        $response = ""
         try {
             # Ensure ResponseMemory is initialized
             if ($null -eq $this.ResponseMemory) {
@@ -311,7 +321,16 @@ class ProjectTeam {
             }
             
             # Use the user-provided function to get the response
-            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+            $loopCount = 0
+            $maxLoops = 5
+            do {
+                $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+                if (-not [string]::IsNullOrEmpty($response)) {
+                    break
+                }
+                Start-Sleep -Seconds 10
+                $loopCount++
+            } while ($loopCount -lt $maxLoops)
 
             if (-not $script:GlobalState.Stream) {
                 Write-Host $response
@@ -365,7 +384,7 @@ class ProjectTeam {
         
         # Update status
         $this.Status = "In Progress"
-        
+        $response = ""
         try {
             # Ensure ResponseMemory is initialized
             if ($null -eq $this.ResponseMemory) {
@@ -375,7 +394,17 @@ class ProjectTeam {
             
             # Use the user-provided function to get the response
             #$response = & $this.ResponseFunction -SystemPrompt $this.Prompt -UserPrompt $Expertinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens
-            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $Expertinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+
+            $loopCount = 0
+            $maxLoops = 5
+            do {
+                $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $Expertinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+                if (-not [string]::IsNullOrEmpty($response)) {
+                    break
+                }
+                Start-Sleep -Seconds 10
+                $loopCount++
+            } while ($loopCount -lt $maxLoops)
 
             if (-not $script:GlobalState.Stream) {
                 write-Host $response
@@ -450,12 +479,22 @@ class ProjectTeam {
         $summaryPrompt = "Summarize the following memory entries:"
         $memoryEntries = $this.ResponseMemory | ForEach-Object { "[$($_.Timestamp)] $($_.Response)" }
         $fullPrompt = "$summaryPrompt`n`n$($memoryEntries -join "`n")"
-
+        $summary = ""
         try {
             # Use the user-provided function to get the summary
             #$summary = & $this.ResponseFunction -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.9 -MaxTokens $script:MaxTokens
-            $summary = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.7 -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
-       
+            $loopCount = 0
+            $maxLoops = 5
+            do {
+                $summary = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.7 -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+
+                if (-not [string]::IsNullOrEmpty($summary)) {
+                    break
+                }
+                Start-Sleep -Seconds 10
+                $loopCount++
+            } while ($loopCount -lt $maxLoops)
+
             # Log the summary
             $this.AddLogEntry("Generated summary:`n$summary")
             return $summary
@@ -1831,7 +1870,7 @@ function Invoke-RAG {
             # Process the cleaned web results text with the project manager's input processing function
             $RAGresponse = $RAGAgent.ProcessInput((Remove-StringDirtyData -inputString $webResultsText), $prompt)
             if ($RAGresponse) {
-                Write-Host ">> AI Agent data was successfully augmented with RAG data." -ForegroundColor Green
+                Write-Host ">> RAG is on. AI Agent data was successfully augmented with new data." -ForegroundColor Green
             }
         }
         # Return the response generated by the project manager
@@ -1844,7 +1883,7 @@ function Invoke-RAG {
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
         #Write-Warning $_
-        Write-Host "-- No RAG data available to add to the context." -ForegroundColor DarkYellow
+        Write-Host "-- No RAG data available to augment." -ForegroundColor DarkYellow
         return
     }
 }
