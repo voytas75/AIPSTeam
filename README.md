@@ -84,7 +84,7 @@ For more information on the AI models and services used in this script, please r
   - `-NODocumentator`: Disables the Documentator functions.
   - `-NOLog`: Disables the logging functions.
   - `-LogFolder`: Specifies the folder where logs should be stored.
-  - `-DeploymentChat`: Specifies the deployment chat environment variable for Azure OpenAI (default: retrieved from environment variable `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT` - [PSAOAI](https://github.com/voytas75/AzureOpenAI-PowerShell/tree/master/PSAOAI#powershell-azure-openai-psaoai-module)).
+  - `-DeploymentChat`: Specifies the deployment chat environment variable for Azure OpenAI (default: retrieved from environment variable `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT` - [PSAOAI](https://github.com/voytas75/PSAOAI)).
   - `MaxTokens`: Specifies the maximum number of tokens to generate in the response. This parameter controls the length of the generated output. The default value is set within the script, but it can be overridden by the user if needed.
   - `-LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
   - `-NOTips`: Disables tips.
