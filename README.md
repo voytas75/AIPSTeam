@@ -1,4 +1,4 @@
-# AI PowerShell Team Script
+# AI PowerShell Team with RAG
 
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AIPSTeam)](https://www.powershellgallery.com/packages/AIPSTeam)
 
