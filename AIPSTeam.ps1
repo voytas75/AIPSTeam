@@ -1791,7 +1791,6 @@ function Remove-StringDirtyData {
     # Join the lines back into a single string
     $cleanedString = $lines -join "`n"
 
-
     return $cleanedString
 }
 
@@ -1814,7 +1813,8 @@ function Invoke-RAG {
         if (-not [string]::IsNullOrEmpty($shortenedUserInput)) {
             # Perform a web search using Bing with the user input and limit the results to 2
             $webResults = Invoke-BingWebSearch -query $shortenedUserInput -count $MaxCount
-        } else {
+        }
+        else {
             throw "The query is empty. Unable to perform web search."
         }
 
