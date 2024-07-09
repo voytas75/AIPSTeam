@@ -25,7 +25,14 @@
 
 ## Overview
 
-This PowerShell script simulates a team of specialists working together on a PowerShell project. Each specialist has a unique role and contributes to the project in a sequential manner. The script processes user input, performs various tasks, and generates outputs such as code, documentation, and analysis reports. App can utylize Azure OpenAI, Ollama or LMStudio to generate the output.
+This PowerShell script simulates a team of specialists working together on a PowerShell project. Each specialist has a unique role and contributes to the project in a sequential manner. The script processes user input, performs various tasks, and generates outputs such as code, documentation, and analysis reports. The application utilizes Retrieval-Augmented Generation (RAG) to enhance its capabilities and can leverage Azure OpenAI, Ollama, or LM Studio to generate the output.
+
+**Retrieval-Augmented Generation (RAG)** combines retrieval and generation processes to produce accurate and contextually relevant outputs. The framework operates as follows:
+
+1.	 Retrieval: The system retrieves pertinent information from extensive data sources.
+2.	 Generation: A generative model uses the retrieved information to produce coherent and appropriate responses.
+
+By integrating these two phases, RAG ensures the AI specialists deliver precise and informed outputs based on a comprehensive knowledge base.
 
 For more information on the AI models and services used in this script, please refer to the following links:
 
