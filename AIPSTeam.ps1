@@ -6,7 +6,7 @@
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer
 .RELEASENOTES
-3.0.1[unpublished]: implement RAG based on Bing Web search API, add method to class.
+3.0.1[unpublished]: implement RAG based on Bing Web search API, add method to class, extend globalstate for all params.
 2.1.2: minor fixes.
 2.1.1: move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
 2.0.1: add abstract layer for LLM providers, fix update of lastPSDevCode, ann NOTips, Updated error handling, Added VerbosePrompt switch.
@@ -251,9 +251,9 @@ class ProjectTeam {
             #Write-Host $userinput -ForegroundColor Cyan
             # Use the user-provided function to get the response
             #$response = & $this.ResponseFunction -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens
-            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
  
-            if (-not $script:Stream) {
+            if (-not $script:GlobalState.Stream) {
                 #write-host ($response | convertto-json -Depth 100)
                 Write-Host $response
             }
@@ -311,9 +311,9 @@ class ProjectTeam {
             }
             
             # Use the user-provided function to get the response
-            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
 
-            if (-not $script:Stream) {
+            if (-not $script:GlobalState.Stream) {
                 Write-Host $response
             }
             
@@ -322,9 +322,9 @@ class ProjectTeam {
             
             # Store the response in memory with timestamp
             $this.ResponseMemory.Add([PSCustomObject]@{
-                Response  = $response
-                Timestamp = Get-Date
-            })
+                    Response  = $response
+                    Timestamp = Get-Date
+                })
             
             $feedbackSummary = ""
             if ($this.FeedbackTeam.count -gt 0) {
@@ -375,9 +375,9 @@ class ProjectTeam {
             
             # Use the user-provided function to get the response
             #$response = & $this.ResponseFunction -SystemPrompt $this.Prompt -UserPrompt $Expertinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens
-            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $Expertinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $Expertinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
 
-            if (-not $script:stream) {
+            if (-not $script:GlobalState.Stream) {
                 write-Host $response
             }
         
@@ -454,7 +454,7 @@ class ProjectTeam {
         try {
             # Use the user-provided function to get the summary
             #$summary = & $this.ResponseFunction -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.9 -MaxTokens $script:MaxTokens
-            $summary = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.7 -MaxTokens $script:MaxTokens -Stream $script:Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+            $summary = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.7 -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
        
             # Log the summary
             $this.AddLogEntry("Generated summary:`n$summary")
@@ -1039,30 +1039,41 @@ function Set-FeedbackAndGenerateResponse {
         [PSCustomObject] $GlobalState
     )
     try {
-
         # Generate the feedback prompt using the provided description and code
         $feedbackPrompt = Get-FeedbackPrompt -description $GlobalState.UserInput -code $GlobalState.LastPSDevCode
 
+        # If RAG (Retrieve and Generate) is enabled, append RAG data to the feedback prompt
+        if ($GlobalState.RAG) {
+            $RAGresponse = Invoke-RAG -userInput $GlobalState.UserInput -prompt "Analyze the provided text and present key information, thoughts, and questions." -RAGAgent $Reviewer
+            $feedbackPrompt += "`n`n###RAG data###`n````````text`n$RAGresponse`n````````"
+        }
+
+        # If a tip amount is specified, append a note about the tip to the feedback prompt
         if ($tipAmount) {
             $feedbackPrompt += "`n`nNote: There is `$$tipAmount tip for this task."
         }
-        # Get feedback from the role object
+
+        # Get feedback from the reviewer
         $feedback = $Reviewer.Feedback($Recipient, $feedbackPrompt)
 
         # Add the feedback to global responses
         Add-ToGlobalResponses -GlobalState $GlobalState -response $feedback
 
-        # Process the feedback and generate a response
+        # Generate the response based on the feedback
+        $responsePrompt = "Modify Powershell code with suggested improvements and optimizations based on $($Reviewer.Name) review. The previous version of the code has been shared below after the feedback block.`n`n````````text`n" + $($Reviewer.GetLastMemory().Response) + "`n`````````n`nHere is previous version of the code:`n`n``````powershell`n$($GlobalState.LastPSDevCode)`n```````n`nShow the new version of PowerShell code. Think step by step. Make sure your answer is unbiased. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks."
+
+        # If a tip amount is specified, include it in the response prompt
         if ($tipAmount) {
-            $response = $Recipient.ProcessInput("Modify Powershell code with suggested improvements and optimizations based on $($Reviewer.Name) review. The previous version of the code has been shared below after the feedback block.`n`n````````text`n" + $($Reviewer.GetLastMemory().Response) + "`n`````````n`nHere is previous version of the code:`n`n``````powershell`n$($GlobalState.LastPSDevCode)`n```````n`nShow the new version of PowerShell code. Think step by step. Make sure your answer is unbiased. I will tip you `$$tipAmount for the correct code. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks.")
+            $responsePrompt += " I will tip you `$$tipAmount for the correct code."
         }
-        else {
-            $response = $Recipient.ProcessInput("Modify Powershell code with suggested improvements and optimizations based on $($Reviewer.Name) review. The previous version of the code has been shared below after the feedback block.`n`n````````text`n" + $($Reviewer.GetLastMemory().Response) + "`n`````````n`nHere is previous version of the code:`n`n``````powershell`n$($GlobalState.LastPSDevCode)`n```````n`nShow the new version of PowerShell code. Think step by step. Make sure your answer is unbiased. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks.")
-        }
+
+        # Get the response from the recipient
+        $response = $Recipient.ProcessInput($responsePrompt)
 
         return $response
     }    
     catch [System.Exception] {
+        # Handle any exceptions that occur during the process
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
@@ -1312,23 +1323,35 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
 
 function Save-ProjectState {
     param (
-        [string]$FilePath,
-        [PSCustomObject] $GlobalState
+        [string]$FilePath,          # Path to save the project state
+        [PSCustomObject] $GlobalState  # Global state object containing project details
     )
     try {
+        # Create a hashtable to store the project state
         $projectState = @{
-            LastPSDevCode            = $GlobalState.lastPSDevCode
-            FileVersion              = $GlobalState.FileVersion
-            GlobalPSDevResponse      = $GlobalState.GlobalPSDevResponse
-            GlobalResponse           = $GlobalState.GlobalResponse
-            TeamDiscussionDataFolder = $GlobalState.TeamDiscussionDataFolder
-            UserInput                = $GlobalState.userInput
-            OrgUserInput             = $GlobalState.OrgUserInput
-            LogFolder                = $GlobalState.LogFolder
+            LastPSDevCode            = $GlobalState.lastPSDevCode            # Last PowerShell developer code
+            FileVersion              = $GlobalState.FileVersion              # Current file version
+            GlobalPSDevResponse      = $GlobalState.GlobalPSDevResponse      # Global PowerShell developer responses
+            GlobalResponse           = $GlobalState.GlobalResponse           # Global responses
+            TeamDiscussionDataFolder = $GlobalState.TeamDiscussionDataFolder # Folder for team discussion data
+            UserInput                = $GlobalState.userInput                # User input
+            OrgUserInput             = $GlobalState.OrgUserInput             # Original user input
+            LogFolder                = $GlobalState.LogFolder                # Folder for logs
+            MaxTokens                = $GlobalState.MaxTokens                # Maximum number of tokens
+            VerbosePrompt            = $GlobalState.VerbosePrompt            # Verbose prompt flag
+            NOTips                   = $GlobalState.NOTips                   # Disable tips flag
+            NOLog                    = $GlobalState.NOLog                    # Disable logging flag
+            NODocumentator           = $GlobalState.NODocumentator           # Disable documentator flag
+            NOPM                     = $GlobalState.NOPM                     # Disable project manager flag
+            RAG                      = $GlobalState.RAG                      # RAG (Retrieve and Generate) functionality flag
+            Stream                   = $GlobalState.Stream                   # Stream output flag
         }
+        
+        # Export the project state to a file in XML format
         $projectState | Export-Clixml -Path $FilePath
     }    
     catch [System.Exception] {
+        # Handle any exceptions that occur during the save process
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
@@ -1337,11 +1360,14 @@ function Save-ProjectState {
 function Get-ProjectState {
     param (
         [string]$FilePath
-        #[PSCustomObject]$GlobalState
     )
     try {
+        # Check if the specified file path exists
         if (Test-Path -Path $FilePath) {
+            # Import the project state from the XML file
             $projectState = Import-Clixml -Path $FilePath
+            
+            # Update the GlobalState object with the imported project state values
             $GlobalState.LastPSDevCode = $projectState.LastPSDevCode
             $GlobalState.FileVersion = $projectState.FileVersion
             $GlobalState.GlobalPSDevResponse = $projectState.GlobalPSDevResponse
@@ -1350,13 +1376,25 @@ function Get-ProjectState {
             $GlobalState.GlobalResponse = $projectState.GlobalResponse
             $GlobalState.OrgUserInput = $projectState.OrgUserInput
             $GlobalState.LogFolder = $projectState.LogFolder
+            $GlobalState.MaxTokens = $projectState.MaxTokens
+            $GlobalState.VerbosePrompt = $projectState.VerbosePrompt
+            $GlobalState.NOTips = $projectState.NOTips
+            $GlobalState.NOLog = $projectState.NOLog
+            $GlobalState.NODocumentator = $projectState.NODocumentator
+            $GlobalState.NOPM = $projectState.NOPM
+            $GlobalState.RAG = $projectState.RAG
+            $GlobalState.Stream = $projectState.Stream
+            
+            # Return the updated GlobalState object
             return $GlobalState
         }
         else {
+            # Inform the user that the project state file was not found
             Write-Host "-- Project state file not found."
         }
     }    
     catch [System.Exception] {
+        # Handle any exceptions that occur during the process
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
@@ -1438,39 +1476,51 @@ function Invoke-LLMChatCompletion {
         [string]$ollamaModel
     )
 
-    if ($VerbosePrompt) {
-        Write-Host $SystemPrompt -ForegroundColor DarkMagenta
-        Write-Host $UserPrompt -ForegroundColor DarkYellow
-    }
+    try {
+        # Display prompts if VerbosePrompt is enabled
+        if ($GlobalState.VerbosePrompt) {
+            Write-Host $SystemPrompt -ForegroundColor DarkMagenta
+            Write-Host $UserPrompt -ForegroundColor DarkYellow
+        }
 
-    switch ($Provider) {
-        "ollama" {
-            if ($Stream) {
-                Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
-                $script:stream = $false
-                $stream = $false
-            } 
-            return Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
+        # Handle different LLM providers
+        switch ($Provider) {
+            "ollama" {
+                if ($Stream) {
+                    Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
+                    $script:stream = $false
+                    $stream = $false
+                }
+                return Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
+            }
+            "LMStudio" {
+                if ($Stream) {
+                    Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
+                    $script:stream = $false
+                    $stream = $false
+                }
+                $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey "lm-studio" -endpoint "http://localhost:1234/v1/chat/completions"
+                return $response
+            }
+            "OpenAI" {
+                throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
+            }
+            "AzureOpenAI" {
+                return Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+                return Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $GlobalState.MaxTokens -Stream $Stream -LogFolder $LogFolder -DeploymentChat $DeploymentChat
+            }
+            default {
+                throw "!! Unknown LLM provider: $Provider"
+            }
         }
-        "LMStudio" {
-            if ($Stream) {
-                Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
-                $script:stream = $false
-                $stream = $false
-            } 
-            $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey "lm-studio" -endpoint "http://localhost:1234/v1/chat/completions"
-            return $response
-        }
-        "OpenAI" {
-            throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
-        }
-        "AzureOpenAI" {
-            return Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-            return Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $MaxTokens -Stream $Stream -LogFolder $LogFolder -DeploymentChat $DeploymentChat
-        }
-        default {
-            throw "!! Unknown LLM provider: $Provider"
-        }
+    }
+    catch {
+        # Log the error and rethrow it
+        $functionName = $MyInvocation.MyCommand.Name
+        $errorMessage = "Error in ${functionName}: $_"
+        Write-Error $errorMessage
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $LogFolder "ERROR.txt")
+        throw $_
     }
 }
 
@@ -1486,9 +1536,35 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         [string]$DeploymentChat
     )
 
-    # Call Azure OpenAI API
-    $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $MaxTokens -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
-    return $response
+    try {
+        # Log the input parameters for debugging purposes
+        Write-Verbose "SystemPrompt: $SystemPrompt"
+        Write-Verbose "UserPrompt: $UserPrompt"
+        Write-Verbose "Temperature: $Temperature"
+        Write-Verbose "TopP: $TopP"
+        Write-Verbose "MaxTokens: $MaxTokens"
+        Write-Verbose "Stream: $Stream"
+        Write-Verbose "LogFolder: $LogFolder"
+        Write-Verbose "DeploymentChat: $DeploymentChat"
+
+        # Call Azure OpenAI API
+        $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $MaxTokens -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
+
+        # Check if the response is null or empty
+        if (-not $response) {
+            throw "The response from Azure OpenAI API is null or empty."
+        }
+
+        return $response
+    }
+    catch {
+        # Log the error and rethrow it
+        $functionName = $MyInvocation.MyCommand.Name
+        $errorMessage = "Error in ${functionName}: $_"
+        Write-Error $errorMessage
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $LogFolder "ERROR.txt")
+        throw $_
+    }
 }
 
 function Invoke-AIPSTeamOllamaCompletion {
@@ -1624,10 +1700,10 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
 
 function Invoke-BingWebSearch {
     param (
-        [string]$query,  # The search query
-        [string]$apiKey = $env:BINGAPIKEY,  # The API key for Bing Search API
-        [string]$endpoint = "https://api.bing.microsoft.com/v7.0/search",  # The endpoint for Bing Search API
-        [string]$language = "en-US",  # The language for the search results
+        [string]$query, # The search query
+        [string]$apiKey = $env:BINGAPIKEY, # The API key for Bing Search API
+        [string]$endpoint = "https://api.bing.microsoft.com/v7.0/search", # The endpoint for Bing Search API
+        [string]$language = "en-US", # The language for the search results
         [int]$count = 1  # The number of search results to return
     )
 
@@ -1638,8 +1714,8 @@ function Invoke-BingWebSearch {
 
     # Define the parameters for the API request
     $params = @{
-        "q" = $query
-        "mkt" = $language
+        "q"     = $query
+        "mkt"   = $language
         "count" = $count
     }
 
@@ -1677,26 +1753,31 @@ function Invoke-BingWebSearch {
 function Invoke-RAG {
     param (
         [string]$userInput,
-        [string]$prompt
+        [string]$prompt,
+        $RAGAgent
     )
 
     try {
+
+        # Shorten the user input to be used as a query for Bing search
+        $shortenedUserInput = $RAGAgent.ProcessInput($userInput, "Shorten the following text to be used as a search query: $userInput")
+
         # Perform a web search using Bing with the user input and limit the results to 2
-        $webResults = Invoke-BingWebSearch -query $userInput -count 2
+        $webResults = Invoke-BingWebSearch -query $shortenedUserInput -count 2
         $RAGresponse = $null
 
         # Check if web results are returned
         if ($webResults) {
             # Extract and clean text content from the web results
             $webResultsText = ($webResults | ForEach-Object {
-                $htmlContent = Invoke-WebRequest -Uri $_.url
-                $textContent = ($htmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText -replace '(?m)^\s*$',''
-                $textContent
-            }) -join "`n`n"
+                    $htmlContent = Invoke-WebRequest -Uri $_.url
+                    $textContent = ($htmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText -replace '(?m)^\s*$', ''
+                    $textContent
+                }) -join "`n`n"
         }
 
         # Process the cleaned web results text with the project manager's input processing function
-        $RAGresponse = $projectManager.ProcessInput($webResultsText, $prompt)
+        $RAGresponse = $RAGAgent.ProcessInput($webResultsText, $prompt)
         
         # Return the response generated by the project manager
         return $RAGresponse
@@ -1723,6 +1804,14 @@ $GlobalState = [PSCustomObject]@{
     OrgUserInput             = ""
     UserInput                = ""
     LogFolder                = ""
+    MaxTokens                = $MaxTokens
+    VerbosePrompt            = $VerbosePrompt
+    NOTips                   = $NOTips
+    NOLog                    = $NOLog
+    NODocumentator           = $NODocumentator
+    NOPM                     = $NOPM
+    RAG                      = $RAG
+    Stream                   = $Stream
 }
 $GlobalState.LogFolder = $LogFolder
 
@@ -1766,6 +1855,14 @@ if ($LoadProjectStatus) {
         Write-Verbose "`$GlobalState.OrgUserInput: $($GlobalState.OrgUserInput)"
         Write-Verbose "`$GlobalState.UserInput: $($GlobalState.UserInput)"
         Write-Verbose "`$GlobalState.LogFolder: $($GlobalState.LogFolder)"
+        Write-Verbose "`$GlobalState.MaxTokens: $($GlobalState.MaxTokens)"
+        Write-Verbose "`$GlobalState.VerbosePrompt: $($GlobalState.VerbosePrompt)"
+        Write-Verbose "`$GlobalState.NOTips: $($GlobalState.NOTips)"
+        Write-Verbose "`$GlobalState.NOLog: $($GlobalState.NOLog)"
+        Write-Verbose "`$GlobalState.NODocumentator: $($GlobalState.NODocumentator)"
+        Write-Verbose "`$GlobalState.NOPM: $($GlobalState.NOPM)"
+        Write-Verbose "`$GlobalState.RAG: $($GlobalState.RAG)"
+        Write-Verbose "`$GlobalState.Stream: $($GlobalState.Stream)"
     }    
     catch [System.Exception] {
         # Handle any exceptions that occur during the loading of the project state
@@ -1828,7 +1925,7 @@ Additional information: PowerShell is a task automation and configuration manage
     0.9,
     [scriptblock]::Create({
             param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
             return $response
         }),
     $GlobalState
@@ -1861,7 +1958,7 @@ You act as {0}. Your task is provide specialized insights and recommendations ba
     0.9,
     [scriptblock]::Create({
             param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream
+            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream
             return $response
         }),
     $GlobalState
@@ -1889,7 +1986,7 @@ Design includes:
     0.85,
     [scriptblock]::Create({
             param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
             return $response
         }),
     $GlobalState
@@ -1936,7 +2033,7 @@ Instructions:
     0.8,
     [scriptblock]::Create({
             param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
             return $response
         }),
     $GlobalState
@@ -1962,7 +2059,7 @@ Background Information: PowerShell scripts can perform a wide range of tasks, so
     0.9,
     [scriptblock]::Create({
             param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
             return $response
         }),
     $GlobalState
@@ -1991,7 +2088,7 @@ You act as {0}. You are tasked with creating comprehensive documentation for the
     0.8,
     [scriptblock]::Create({
             param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
             return $response
         }),
     $GlobalState
@@ -2020,7 +2117,7 @@ You act as {0}. Your task is to provide a comprehensive summary of the PowerShel
     0.85,
     [scriptblock]::Create({
             param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $script:Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
             return $response
         }),
     $GlobalState
@@ -2048,13 +2145,13 @@ elseif ($LLMProvider -eq "ollama") {
     $script:ollamaModel = Read-Host "Please provide the LLM model for ollama"
 }
 
-if ($NOLog) {
+if ($GlobalState.NOLog) {
     foreach ($TeamMember_ in $Team) {
         $TeamMember_.LogFilePath = ""
     }
 }
 
-if (-not $NOLog) {
+if (-not $GlobalState.NOLog) {
     foreach ($TeamMember in $Team) {
         $TeamMember.DisplayInfo(0) | Out-File -FilePath $TeamMember.LogFilePath -Append
     }
@@ -2063,8 +2160,8 @@ if (-not $NOLog) {
 }
 
 $RAGpromptAddon = $null
-if ($RAG) {
-    $RAGresponse = Invoke-RAG -userInput $userInput -prompt "The assistant must analyze the provided text through the prism of the description provided by the user: '$userInput' and present a list of key information, thoughts and questions."
+if ($GlobalState.RAG) {
+    $RAGresponse = Invoke-RAG -userInput $userInput -prompt "The assistant must analyze the provided text through the prism of the description provided by the user: '$userInput' and present a list of key information, thoughts and questions." -RAGAgent $projectManager
     $RAGpromptAddon = @"
 
 ###RAG data###
@@ -2105,7 +2202,7 @@ $userInputOryginal
 ````````
 $RAGpromptAddon
 "@
-    if (-not $NOTips) {
+    if (-not $GlobalState.NOTips) {
         $projectManagerPrompt += "`n`nNote: There is `$50 tip for this task."
     }
     $projectManagerFeedback = $projectManager.Feedback($powerShellDeveloper, $projectManagerPrompt)
@@ -2122,7 +2219,7 @@ $($GlobalState.userInput)
 
 $examplePScode
 "@
-    if (-not $NOTips) {
+    if (-not $GlobalState.NOTips) {
         $powerShellDeveloperPrompt += "`n`nNote: There is `$50 tip for this task."
     }
 
@@ -2133,10 +2230,10 @@ $examplePScode
     Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
     Save-AndUpdateCode -response $powerShellDeveloperResponce -GlobalState $GlobalState
     #endregion PM-PSDev
-    return
+
     #region RA-PSDev
     #Invoke-ProcessFeedbackAndResponse -role $requirementsAnalyst -description $GlobalState.userInput -code $lastPSDevCode -tipAmount 100 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $GlobalState.TeamDiscussionDataFolder
-    if ($NOTips) {
+    if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $powerShellDeveloper -GlobalState $GlobalState
     }
     else {
@@ -2145,7 +2242,7 @@ $examplePScode
     #endregion RA-PSDev
 
     #region SA-PSDev
-    if ($NOTips) {
+    if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $powerShellDeveloper -GlobalState $GlobalState
     }
     else {
@@ -2155,7 +2252,7 @@ $examplePScode
     #endregion SA-PSDev
 
     #region DE-PSDev
-    if ($NOTips) {
+    if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $powerShellDeveloper -GlobalState $GlobalState
     }
     else {
@@ -2164,7 +2261,7 @@ $examplePScode
     #endregion DE-PSDev
 
     #region QAE-PSDev
-    if ($NOTips) {
+    if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $powerShellDeveloper -GlobalState $GlobalState
     }
     else {
@@ -2177,8 +2274,8 @@ $examplePScode
     #endregion PSScriptAnalyzer
 
     #region Doc
-    if (-not $NODocumentator) {
-        if (-not $NOLog) {
+    if (-not $GlobalState.NODocumentator) {
+        if (-not $GlobalState.NOLog) {
             $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode) | Out-File -FilePath $DocumentationFullName
         }
         else {
@@ -2494,9 +2591,9 @@ do {
 #endregion Menu
 
 #region PM Project report
-if (-not $NOPM) {
+if (-not $GlobalState.NOPM) {
     # Example of summarizing all steps,  Log final response to file
-    if (-not $NOLog) {
+    if (-not $GlobalState.NOLog) {
         $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ") | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
     }
     else {
@@ -2507,7 +2604,7 @@ if (-not $NOPM) {
 #endregion PM Project report
 
 #region Final code
-if (-not $NOLog) {
+if (-not $GlobalState.NOLog) {
     # Log Developer last memory
     $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.PS1"
     $GlobalState.lastPSDevCode | Out-File -FilePath $TheFinalCodeFullName
