@@ -1,0 +1,237 @@
+	PowerShell Script Analyzer: Static Code analysis for Windows PowerShell scripts &#038; modules - PowerShell Team
+
+        Skip to main content
+
+                        Microsoft
+
+                Powershell Team
+
+                                Powershell Team
+
+                            Powershell Team
+
+                         Home 
+
+                            DevBlogs
+
+                                Developer
+
+            Visual Studio
+
+            Visual Studio Code
+
+            Develop from the cloud
+
+            Visual Studio for Mac
+
+            DevOps
+
+            Windows Developer
+
+            Developer support
+
+            ISE Developer
+
+            Engineering@Microsoft
+
+            Azure SDK
+
+            Command Line
+
+            Perf and Diagnostics
+
+            Dr. International
+
+            Math in Office
+
+            React Native
+
+                                Technology
+
+            DirectX
+
+            Semantic Kernel
+
+            SurfaceDuo
+
+            Windows AI Platform
+
+                                Languages
+
+            C++
+
+            C#
+
+            F#
+
+            TypeScript
+
+            PowerShell Community
+
+            PowerShell Team
+
+            Python
+
+            JavaScript
+
+            Java
+
+            Java Blog in Chinese
+
+            Go
+
+                                .NET
+
+            All .NET posts
+
+            .NET MAUI
+
+            ASP.NET Core
+
+            Blazor
+
+            Entity Framework
+
+            AI
+
+            Machine Learning
+
+            Servicing
+
+            .NET Blog in Chinese
+
+                                Platform Development
+
+            #ifdef Windows
+
+            Azure Government
+
+            Azure VM Runtime Team
+
+            Bing Dev Center
+
+            Microsoft Edge Dev
+
+            Microsoft Azure
+
+            Microsoft 365 Developer
+
+            Microsoft Entra Identity Developer Blog
+
+            Old New Thing
+
+            Power Platform
+
+            Windows MIDI and Music dev
+
+                                Data Development
+
+             Azure Cosmos DB
+
+            Azure Data Studio
+
+            Azure SQL Database
+
+            OData
+
+            Revolutions R
+
+            SQL Server Data Tools
+
+        More
+
+                                        Search
+                                        Search
+
+                                         No results
+
+                            Cancel
+
+            Have you tried email subscriptions yet?
+            Get notified in your email when a new post is published to this blog
+
+                    Subscribe 
+
+            Close 
+
+        PowerShell Script Analyzer: Static Code analysis for Windows PowerShell scripts &#038; modules          PowerShell Team        
+
+            February 24th, 20150 0
+
+        &nbsp;
+Introduction:
+Windows Management Framework 5.0 Preview February 2015 includes the addition of a new Windows PowerShell Module called PSScriptAnalyzer. This is a static code checker for Windows PowerShell modules and scripts and is installed in $env:ProgramFiles/WindowsPowerShell/Modules.
+&nbsp;
+&nbsp;
+&nbsp;
+PSScriptAnalyzer checks the quality of Windows PowerShell code by running a set of rules. The rules are based on PowerShell best practices identified by PowerShell Team and the community. PSScriptAnalyzer generates DiagnosticResults (errors and warnings) to inform users about potential code defects and suggests possible solutions for improvements.
+PSScriptAnalyzer is shipped with a collection of built-in rules that checks various aspects of PowerShell code such as presence of uninitialized variables, usage of PSCredential Type, usage of Invoke-Expression etc. Additional functionalities such as exclude/include specific rules are also supported.
+Custom rules written as PowerShell scripts can be supplied to the Script Analyzer. Read more about this in the last section. Code samples are also posted.
+&nbsp;
+&nbsp;
+Usage and Scenarios:
+
+PSScriptAnalyzer is shipped with the following built-in rules.
+
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+
+Excluding specified rules when using PSScriptAnalyzer
+
+&nbsp;
+&nbsp;
+&nbsp;
+
+Run only a specific set of rules, by adding the IncludeRule parameter:
+
+&nbsp;
+&nbsp;
+&nbsp;
+Authoring Custom/External Rules as PowerShell Scripts:
+PSScriptAnalyzer can consume modules containing definitions for rules. The requirement here is that the exported function containing the rule definition must have a parameter of type &ldquo;Ast&rdquo; or &ldquo;Token&rdquo;. The engine calls into the function and supplies the Ast of the PowerShell script under analysis. The function can do the actual work of validating the Ast. Here is the usage:
+By using the &ldquo;CustomizedRulePath&rdquo; parameter in Invoke-ScriptAnalyzer cmdlet, one can point to a folder/module containing external script rules.
+&nbsp;
+&nbsp;
+Example 1 &ndash; Rule to detect the presence of Write-Host:
+&lt;#
+.SYNOPSIS
+&nbsp;&nbsp;&nbsp; You should never use Write-Host to create any script output whatsoever.
+.DESCRIPTION
+&nbsp;&nbsp;&nbsp; It is generally accepted that you should never use Write-Host to create any script output whatsoever, unless your script (or function, or whatever) uses the Show verb (as in, Show-Performance).
+&nbsp;&nbsp;&nbsp; That verb explicitly means &ldquo;show on the screen, with no other possibilities.&rdquo; Like Show-Command.
+&nbsp;&nbsp;&nbsp; To fix a violation of this rule, please replace Write-Host with Write-Output in most scenarios.
+.EXAMPLE
+&nbsp;&nbsp;&nbsp; Test-WriteHost -CommandAst $CommandAst
+.INPUTS
+&nbsp;&nbsp;&nbsp; [System.Management.Automation.Language.CommandAst]
+.OUTPUTS
+&nbsp;&nbsp;&nbsp; [PSCustomObject[]]
+.NOTES
+&nbsp;&nbsp;&nbsp; Reference: Output, The Community Book of PowerShell Practices.
+#&gt;
+function Test-WriteHost
+{
+&nbsp;&nbsp;&nbsp; [CmdletBinding()]
+&nbsp;&nbsp;&nbsp; [OutputType([PSCustomObject[]])]
+&nbsp;&nbsp;&nbsp; Param
+&nbsp;&nbsp;&nbsp; (
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [Parameter(Mandatory = $true)]
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ValidateNotNullOrEmpty()]
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [System.Management.Automation.Language.CommandAst]
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $CommandAst
+&nbsp;&nbsp;&nbsp; )
+&nbsp;
+&nbsp;&nbsp;&nbsp; Process
+&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $commandName = $CommandAst.GetCommandName()
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Checks command name, if the command name matches Write-Host or
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # user-defined aliases, this rule is triggered.
+&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if ($null -ne $commandName)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $alias = (Get-Alias -Definition &#8220;Write-Host&#8221; -ErrorAction SilentlyContinue).Name
+&nbsp; 

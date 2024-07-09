@@ -3,12 +3,13 @@ function Invoke-BingQuery {
       [string]$Query,
       [string]$Language = "en-US",  # Default to English (US)
       [string]$UILanguage = "en",    # User interface language
-      [int]$count = 20
+      [int]$count = 2
   )
   
   $Key = $env:BINGAPIKEY
   $QueryString = [System.Net.WebUtility]::UrlEncode($Query)
-  $Uri = "https://api.bing.microsoft.com/v7.0/search?q=$QueryString&mkt=$Language&setLang=$UILanguage&count=$count"
+  #$Uri = "https://api.bing.microsoft.com/v7.0/search?q=$QueryString&mkt=$Language&setLang=$UILanguage&count=$count"
+  $Uri = "https://api.bing.microsoft.com/v7.0/search?q=$QueryString&mkt=$Language&count=$count"
 
   $Headers = @{
       "Ocp-Apim-Subscription-Key" = $Key
@@ -19,13 +20,19 @@ function Invoke-BingQuery {
 }
 
 
-$query = "azure ai semantic search"
+$query = "Powershell code review for script parsing and analyzing DHCP logs"
 
 #$Results = Invoke-BingQuery -Query "PowerShell" -Language "pl-pl" -UILanguage "en"
-$Results = Invoke-BingQuery -Query $query -count 1
+$Results = Invoke-BingQuery -Query $query
+
+if (-not $Results) {
+  Write-Host "No result" -ForegroundColor Red
+  return
+}
 
 # Display results
 $url = ($Results.webPages.value | Select-Object url).url
+
 
 # Search in German (Germany) with English UI
 #$Results = Invoke-BingQuery -Query "PowerShell" -Language "de-DE" -UILanguage "en"
@@ -58,7 +65,15 @@ $text
 
 
 
-$html = Invoke-WebRequest -Uri $url
+if ($url -is [System.Object[]]) {
+    foreach ($u in $url) {
+        $html = Invoke-WebRequest -Uri $u
+        # Process $html as needed
+    }
+} else {
+    $html = Invoke-WebRequest -Uri $url
+    # Process $html as needed
+}
 
 
 $code =@"
@@ -76,7 +91,7 @@ $code =@"
 
  $text = ($html.Content | PowerHTML\ConvertFrom-HTML).innerText -replace '(?m)^\s*$', ''
 
- $a = $text | PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt "Analyzer of text" -OneTimeUserPrompt -Mode Balanced -simpleresponse -usermessagelogfile "Summary text"
+ $a = $text | PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt "Asisstent role is Text Analyzer. the task is to get only key informations." -OneTimeUserPrompt -Mode Balanced -simpleresponse
 #$html.Content
 #$text = $html.DocumentNode.InnerText
 #$text

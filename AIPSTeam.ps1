@@ -4,7 +4,7 @@
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt
 .PROJECTURI https://github.com/voytas75/AIPSTeam
-.EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer
+.EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
 3.0.1[unpublished]: implement RAG based on Bing Web search API, add method to class, extend globalstate for all params.
 2.1.2: minor fixes.
@@ -1044,8 +1044,10 @@ function Set-FeedbackAndGenerateResponse {
 
         # If RAG (Retrieve and Generate) is enabled, append RAG data to the feedback prompt
         if ($GlobalState.RAG) {
-            $RAGresponse = Invoke-RAG -userInput $GlobalState.UserInput -prompt "Analyze the provided text and present key information, thoughts, and questions." -RAGAgent $Reviewer
-            $feedbackPrompt += "`n`n###RAG data###`n````````text`n$RAGresponse`n````````"
+            $RAGresponse = Invoke-RAG -userInput $feedbackPrompt -prompt "Analyze the provided text and present key information, thoughts, and questions." -RAGAgent $Reviewer
+            if ($RAGresponse) {
+                $feedbackPrompt += "`n`n###RAG data###`n````````text`n$RAGresponse`n````````"
+            }
         }
 
         # If a tip amount is specified, append a note about the tip to the feedback prompt
@@ -1323,7 +1325,7 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
 
 function Save-ProjectState {
     param (
-        [string]$FilePath,          # Path to save the project state
+        [string]$FilePath, # Path to save the project state
         [PSCustomObject] $GlobalState  # Global state object containing project details
     )
     try {
@@ -1410,12 +1412,35 @@ function Update-ErrorHandling {
         [string]$LogFilePath
     )
 
+    # Provide suggestions based on the error type
+    $suggestions = switch -Regex ($ErrorRecord.Exception.Message) {
+        "PSScriptAnalyzer" {
+            "Ensure the PSScriptAnalyzer module is installed and up-to-date. Use 'Install-Module -Name PSScriptAnalyzer' or 'Update-Module -Name PSScriptAnalyzer'."
+        }
+        "PSAOAI" {
+            "Check the PSAOAI module installation and the deployment environment variable. Ensure the API key and endpoint are correctly configured."
+        }
+        "UnauthorizedAccessException" {
+            "Check the file permissions and ensure you have the necessary access rights to the file or directory."
+        }
+        "IOException" {
+            "Ensure the file path is correct and the file is not being used by another process."
+        }
+        "(403)" {
+            "I recommend checking your API key, permissions, and any other relevant settings. You might also want to consult the Azure documentation or seek assistance from the Azure support team."
+        }
+        default {
+            "Refer to the error message and stack trace for more details. Consult the official documentation or seek help from the community."
+        }
+    }
+
     # Capture detailed error information
     $errorDetails = [ordered]@{
         Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         ErrorMessage      = $ErrorRecord.Exception.Message
         ExceptionType     = $ErrorRecord.Exception.GetType().FullName
         ErrorContext      = $ErrorContext
+        Suggestions       = $Suggestions
         ScriptFullName    = $MyInvocation.ScriptName
         LineNumber        = $MyInvocation.ScriptLineNumber
         StackTrace        = $ErrorRecord.ScriptStackTrace
@@ -1425,39 +1450,21 @@ function Update-ErrorHandling {
 
     } | ConvertTo-Json
 
-    # Provide suggestions based on the error type
-    $suggestions = switch -Regex ($ErrorMessage) {
-        "PSScriptAnalyzer" {
-            "Ensure the PSScriptAnalyzer module is installed and up-to-date. Use 'Install-Module -Name PSScriptAnalyzer' or 'Update-Module -Name PSScriptAnalyzer'."
-        }
-        "Invoke-PSAOAIChatCompletion" {
-            "Check the PSAOAI module installation and the deployment chat environment variable. Ensure the API key and endpoint are correctly configured."
-        }
-        "UnauthorizedAccessException" {
-            "Check the file permissions and ensure you have the necessary access rights to the file or directory."
-        }
-        "IOException" {
-            "Ensure the file path is correct and the file is not being used by another process."
-        }
-        default {
-            "Refer to the error message and stack trace for more details. Consult the official documentation or seek help from the community."
-        }
-    }
 
     # Display the error details and suggestions
     #Write-Host "-- Error: $($ErrorRecord.Exception.Message)"
-    Write-Host "-- Context: $ErrorContext"
-    Write-Host "-- Suggestions: $suggestions"
-    Write-Host "-- Error: $($ErrorRecord.Exception.Message)"
+    Write-Host "-- Context: $ErrorContext" -ForegroundColor Yellow
+    Write-Host "-- Suggestions: $suggestions" -ForegroundColor Yellow
+    Write-Host "-- Error: $($ErrorRecord.Exception.Message)" -ForegroundColor Yellow
 
     # Log the error details if LogFilePath is provided
     if ($LogFilePath) {
         $errorDetails | Out-File -FilePath $LogFilePath -Append -Force
         if (Test-Path -Path $LogFilePath) {
-            Write-Host "Error details have been saved to the file: $LogFilePath" -ForegroundColor Yellow
+            Write-Host "-- Error details have been saved to the file: $LogFilePath" -ForegroundColor Yellow
         }
         else {
-            Write-Host "The specified log file path does not exist: $LogFilePath" -ForegroundColor Red
+            Write-Host "-- The specified log file path does not exist: $LogFilePath" -ForegroundColor Red
         }
     }        
 }
@@ -1506,8 +1513,11 @@ function Invoke-LLMChatCompletion {
                 throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
             }
             "AzureOpenAI" {
-                return Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-                return Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $GlobalState.MaxTokens -Stream $Stream -LogFolder $LogFolder -DeploymentChat $DeploymentChat
+                #return Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
+                #return Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse:$true -OneTimeUserPrompt:$true -Stream $Stream -LogFolder $LogFolder -MaxTokens $MaxTokens -User "AIPSTeam"
+                $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
+                
+                return $response
             }
             default {
                 throw "!! Unknown LLM provider: $Provider"
@@ -1533,7 +1543,7 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         [int]$MaxTokens,
         [bool]$Stream,
         [string]$LogFolder,
-        [string]$DeploymentChat
+        [string]$Deployment
     )
 
     try {
@@ -1545,15 +1555,17 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         Write-Verbose "MaxTokens: $MaxTokens"
         Write-Verbose "Stream: $Stream"
         Write-Verbose "LogFolder: $LogFolder"
-        Write-Verbose "DeploymentChat: $DeploymentChat"
+        Write-Verbose "Deployment: $Deployment"
+
 
         # Call Azure OpenAI API
-        $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $MaxTokens -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
+        #$response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $MaxTokens -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat -simpleresponse:$simpleresponse -OneTimeUserPrompt:$OneTimeUserPrompt
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt 
 
         # Check if the response is null or empty
-        if (-not $response) {
-            throw "The response from Azure OpenAI API is null or empty."
-        }
+        #if ([string]::IsNullOrEmpty($response)) {
+        #    throw "The response from Azure OpenAI API is null or empty."
+        #}
 
         return $response
     }
@@ -1750,21 +1762,61 @@ function Invoke-BingWebSearch {
     }
 }
 
+function Remove-StringDirtyData {
+    param (
+        [string]$inputString
+    )
+
+    # Remove leading and trailing whitespace
+    $cleanedString = $inputString.Trim()
+
+    # Remove multiple spaces and replace with a single space
+    $cleanedString = $cleanedString -replace '\s+', ' '
+
+    # Remove any non-printable characters
+    $cleanedString = $cleanedString -replace '[^\x20-\x7E]', ''
+
+    # Remove &nbsp; entities
+    $cleanedString = $cleanedString -replace '&nbsp;', ' '
+
+    # Remove empty lines
+    $cleanedString = $cleanedString -replace '^\s*$\n', ''
+
+    # Convert the string to an array of lines
+    $lines = $cleanedString -split "`n"
+
+    # Remove empty lines
+    $lines = $lines | Where-Object { $_.Trim() -ne "" }
+
+    # Join the lines back into a single string
+    $cleanedString = $lines -join "`n"
+
+
+    return $cleanedString
+}
+
+
 function Invoke-RAG {
     param (
         [string]$userInput,
         [string]$prompt,
-        $RAGAgent
+        [ProjectTeam]$RAGAgent,
+        [int]$MaxCount = 2
     )
-
+    $RAGresponse = $null
     try {
 
         # Shorten the user input to be used as a query for Bing search
-        $shortenedUserInput = $RAGAgent.ProcessInput($userInput, "Shorten the following text to be used as a search query: $userInput")
+        $shortenedUserInput = $RAGAgent.ProcessInput("You must craft short a few terms optimized Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing, analyzing','Powershell, code, psscriptanalyzer','Powershell'. Do not enclose the query in quotation marks or other characters.", "Assistant is a Web Search Query Manager. The task is to create search query.")
 
-        # Perform a web search using Bing with the user input and limit the results to 2
-        $webResults = Invoke-BingWebSearch -query $shortenedUserInput -count 2
-        $RAGresponse = $null
+        Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
+
+        if (-not [string]::IsNullOrEmpty($shortenedUserInput)) {
+            # Perform a web search using Bing with the user input and limit the results to 2
+            $webResults = Invoke-BingWebSearch -query $shortenedUserInput -count $MaxCount
+        } else {
+            throw "The query is empty. Unable to perform web search."
+        }
 
         # Check if web results are returned
         if ($webResults) {
@@ -1773,12 +1825,15 @@ function Invoke-RAG {
                     $htmlContent = Invoke-WebRequest -Uri $_.url
                     $textContent = ($htmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText -replace '(?m)^\s*$', ''
                     $textContent
-                }) -join "`n`n"
-        }
+                }
+            ) -join "`n`n"
 
-        # Process the cleaned web results text with the project manager's input processing function
-        $RAGresponse = $RAGAgent.ProcessInput($webResultsText, $prompt)
-        
+            # Process the cleaned web results text with the project manager's input processing function
+            $RAGresponse = $RAGAgent.ProcessInput((Remove-StringDirtyData -inputString $webResultsText), $prompt)
+            if ($RAGresponse) {
+                Write-Host ">> AI Agent data was successfully augmented with RAG data." -ForegroundColor Green
+            }
+        }
         # Return the response generated by the project manager
         return $RAGresponse
     }
@@ -1788,12 +1843,18 @@ function Invoke-RAG {
         #throw $_
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
-        Throw $_
+        #Write-Warning $_
+        Write-Host "-- No RAG data available to add to the context." -ForegroundColor DarkYellow
+        return
     }
 }
 #endregion Functions
 
 #region Setting Up
+
+$originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
+[Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US')
+
 # Define a state management object
 $GlobalState = [PSCustomObject]@{
     TeamDiscussionDataFolder = $null
@@ -2162,7 +2223,8 @@ if (-not $GlobalState.NOLog) {
 $RAGpromptAddon = $null
 if ($GlobalState.RAG) {
     $RAGresponse = Invoke-RAG -userInput $userInput -prompt "The assistant must analyze the provided text through the prism of the description provided by the user: '$userInput' and present a list of key information, thoughts and questions." -RAGAgent $projectManager
-    $RAGpromptAddon = @"
+    if ($RAGresponse) {
+        $RAGpromptAddon = @"
 
 ###RAG data###
 
@@ -2171,9 +2233,8 @@ $RAGresponse
 ````````
     
 "@
+    }
 }
-
-
 
 if (-not $LoadProjectStatus) {
     #region PM-PSDev
@@ -2308,6 +2369,9 @@ do {
     Write-Host "9. Code Refactoring Suggestions"
     Write-Host "10. Security Audit"
     Write-Host "11. (Q)uit"
+    if (Test-Path -Path (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")) {
+        Write-Host "E. Display content of (e)rror.txt"
+    }
 
     # Get the user's choice
     $userOption = Read-Host -Prompt "Enter your choice"
@@ -2580,6 +2644,16 @@ do {
                     Write-Output "Security improvements were not deployed."
                 }
             }
+            'e' {
+                if (Test-Path -Path (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")) {
+                    $errorContent = Get-Content -Path (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt") -Raw
+                    Show-Header -HeaderText "Content of ERROR.txt"
+                    Write-Output $errorContent
+                }
+                else {
+                    Write-Output "No error file found."
+                }
+            }
             default {
                 # Handle invalid options
                 Write-Information "-- Invalid option. Please try again." -InformationAction Continue
@@ -2639,4 +2713,8 @@ if ($ProjectfilePath) {
 }
 
 Write-Host "Exiting..."
+
+# Ensure to reset the culture back to the original after the script execution
+[void](Register-EngineEvent PowerShell.Exiting -Action { [Threading.Thread]::CurrentThread.CurrentUICulture = $originalCulture })
+
 #endregion Main
