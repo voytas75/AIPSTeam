@@ -6,13 +6,14 @@
 
 ## Table of Contents
 
-- [AI PowerShell Team Script](#ai-powershell-team-script)
+- [AI PowerShell Team with RAG](#ai-powershell-team-with-rag)
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
   - [Features](#features)
   - [User Guide](#user-guide)
     - [Installation](#installation)
     - [Configuration](#configuration)
+      - [Environment Variables](#environment-variables)
     - [Usage](#usage)
   - [Developer Notes](#developer-notes)
     - [Code Structure](#code-structure)
@@ -25,12 +26,12 @@
 
 ## Overview
 
-This PowerShell script simulates a team of specialists working together on a PowerShell project. Each specialist has a unique role and contributes to the project in a sequential manner. The script processes user input, performs various tasks, and generates outputs such as code, documentation, and analysis reports. The application utilizes Retrieval-Augmented Generation (RAG) to enhance its capabilities and can leverage Azure OpenAI, Ollama, or LM Studio to generate the output.
+This PowerShell script simulates a team of AI Agents working together on a PowerShell project. Each Agent has a unique role and contributes to the project in a sequential manner. The script processes user input, performs various tasks, and generates outputs such as code, documentation, and analysis reports. The application utilizes Retrieval-Augmented Generation (RAG) to enhance its capabilities and can leverage Azure OpenAI, Ollama, or LM Studio to generate the output.
 
 **Retrieval-Augmented Generation (RAG)** combines retrieval and generation processes to produce accurate and contextually relevant outputs. The framework operates as follows:
 
-1.	 Retrieval: The system retrieves pertinent information from extensive data sources.
-2.	 Generation: A generative model uses the retrieved information to produce coherent and appropriate responses.
+1. **Retrieval**: The system retrieves pertinent information from extensive data sources.
+2. **Generation**: A generative model uses the retrieved information to produce coherent and appropriate responses.
 
 By integrating these two phases, RAG ensures the AI specialists deliver precise and informed outputs based on a comprehensive knowledge base.
 
@@ -98,6 +99,69 @@ For more information on the AI models and services used in this script, please r
   - `-VerbosePrompt`: Show Prompts.
   - `-LoadProjectStatus`: Loads the project status from a specified path. Part of the 'LoadStatus' parameter set.
   - `-LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
+  - `-NORAG`: Disables the RAG (Retrieve and Generate) functionality.
+
+#### Environment Variables
+
+To configure the script to use external providers, you need to set the following environment variables:
+
+1. **Azure OpenAI**:
+   - `PSAOAI_API_AZURE_OPENAI_KEY`: Your Azure OpenAI API key.
+   - `PSAOAI_API_AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI endpoint.
+   - `PSAOAI_API_AZURE_OPENAI_APIVERSION`: The version of the Azure OpenAI API you want to use.
+   - `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`: Your Azure OpenAI CC deployment name.
+   - `PSAOAI_API_AZURE_OPENAI_C_DEPLOYMENT`: Your Azure OpenAI C deployment name.
+   - `PSAOAI_API_AZURE_OPENAI_D3_DEPLOYMENT`: Your Azure OpenAI D3 deployment name.
+   - `PSAOAI_API_AZURE_OPENAI_E_DEPLOYMENT`: Your Azure OpenAI E deployment name.
+   - `PSAOAI_BANNER`: Disable PSAOAI banner. AIPSTeam sets to "0".
+
+   When you start the script, you will be prompted to provide these environment variables if they are not already set. Alternatively, you can set them earlier to avoid prompts during execution.
+
+   Example:
+
+   ```powershell
+   $env:PSAOAI_API_AZURE_OPENAI_ENDPOINT="https://<your-endpoint>.openai.azure.com"
+   $env:PSAOAI_API_AZURE_OPENAI_APIVERSION="2024-05-01-preview"
+   $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT="your-deployment-name"
+   ```
+
+2. **Ollama**:
+   - `OLLAMA_API_KEY`: Your Ollama API key.
+   - `OLLAMA_API_ENDPOINT`: Your Ollama API endpoint.
+
+   Example:
+
+   ```powershell
+   $env:OLLAMA_API_KEY="your-ollama-api-key"
+   $env:OLLAMA_API_ENDPOINT="https://your-ollama-endpoint"
+   ```
+
+3. **LM Studio**:
+   - `LMSTUDIO_API_KEY`: Your LM Studio API key.
+   - `LMSTUDIO_MODEL`: The LLM model to use with LM Studio.
+
+   Example:
+
+   ```powershell
+   $env:LMSTUDIO_API_KEY="your-lmstudio-api-key"
+   $env:LMSTUDIO_MODEL="your-lmstudio-model"
+   ```
+
+4. **RAG Configuration**:
+   - `RAG_DATA_SOURCE`: The data source for retrieval-augmented generation.
+   - `AZURE_BING_API_KEY`: Your Azure Bing Web Search API key.
+   - `AZURE_BING_ENDPOINT`: Your Azure Bing Web Search endpoint.
+
+   Example:
+
+   ```powershell
+   $env:RAG_DATA_SOURCE="your-data-source"
+   $env:AZURE_BING_API_KEY="your-azure-bing-api-key"
+   $env:AZURE_BING_ENDPOINT="https://api.bing.microsoft.com/v7.0/search"
+   ```
+
+Ensure these environment variables are set before running the script to enable the respective functionalities.
+
 
 ### Usage
 

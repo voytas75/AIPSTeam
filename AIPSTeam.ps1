@@ -30,6 +30,7 @@
 
 #Requires -Modules PSAOAI
 #Requires -Modules PSScriptAnalyzer
+#Requires -Modules PowerHTML
 
 <# 
 .SYNOPSIS 
@@ -724,17 +725,17 @@ function Show-Banner {
   
 '@
     Write-Host @"
-         The script is designed to simulate a project team working on a PowerShell project. The script creates different   
-         roles such as Requirements Analyst, System Architect, PowerShell Developer, QA Engineer, Documentation Specialist, 
-         and Project Manager. Each role has specific tasks and responsibilities, and they interact with each other 
-         to complete a PS project. The script leverages LLMs providers like Azure OpenAI (PSAOAI), Ollama, and LM Studio.
+        This PowerShell script simulates a team of AI Agents working together on a PowerShell project. Each Agent has a 
+        unique role and contributes to the project in a sequential manner. The script processes user input, performs 
+        various tasks, and generates outputs such as code, documentation, and analysis reports. The application utilizes 
+        Retrieval-Augmented Generation (RAG) to enhance its power and leverage Azure OpenAI, Ollama, or LM Studio to generate the output.
          
 "@ -ForegroundColor Blue
   
     Write-Host @"
-         "You never know what you're gonna get with an AI, just like a box of chocolates. You might get a whiz-bang algorithm that 
-         writes you a symphony in five minutes flat, or you might get a dud that can't tell a cat from a couch. But hey, that's 
-         the beauty of it all, you keep feedin' it data and see what kind of miraculous contraption it spits out next."
+        "You never know what you're gonna get with an AI, just like a box of chocolates. You might get a whiz-bang algorithm that 
+        writes you a symphony in five minutes flat, or you might get a dud that can't tell a cat from a couch. But hey, that's 
+        the beauty of it all, you keep feedin' it data and see what kind of miraculous contraption it spits out next."
                       
                                                                      ~ Who said that? You never know with these AIs these days... 
                                                                       ...maybe it was Skynet or maybe it was just your toaster :)
@@ -1553,8 +1554,6 @@ function Invoke-LLMChatCompletion {
                 throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
             }
             "AzureOpenAI" {
-                #return Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-                #return Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse:$true -OneTimeUserPrompt:$true -Stream $Stream -LogFolder $LogFolder -MaxTokens $MaxTokens -User "AIPSTeam"
                 $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
                 
                 return $response
@@ -1752,13 +1751,33 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
 
 function Invoke-BingWebSearch {
     param (
+        [Parameter(Mandatory = $true)]
         [string]$query, # The search query
-        [string]$apiKey = $env:BINGAPIKEY, # The API key for Bing Search API
-        [string]$endpoint = "https://api.bing.microsoft.com/v7.0/search", # The endpoint for Bing Search API
-        [string]$language = "en-US", # The language for the search results
-        [int]$count = 1  # The number of search results to return
-    )
 
+        [Parameter(Mandatory = $false)]
+        [string]$apiKey = [System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User"), # The API key for Bing Search API
+        
+        [Parameter(Mandatory = $false)]
+        [string]$endpoint = [System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"), # The endpoint for Bing Search API
+        
+        [Parameter(Mandatory = $false)]
+        [string]$language = "en-US", # The language for the search results
+        
+        [Parameter(Mandatory = $false)]
+        [int]$count  # The number of search results to return
+    )
+    
+    # Loop until a valid API key is provided
+    while (-not $apiKey) {
+        # Prompt the user to enter their Azure Bing API key
+        $apiKey = Read-Host -Prompt "Please enter your AZURE Bing API key"
+            
+        # If the user provides an API key, save it as an environment variable
+        if ($apiKey) {
+            [System.Environment]::SetEnvironmentVariable("AZURE_BING_API_KEY", $apiKey, "User")
+        }
+    }
+    
     # Define the headers for the API request
     $headers = @{
         "Ocp-Apim-Subscription-Key" = $apiKey
@@ -1771,6 +1790,13 @@ function Invoke-BingWebSearch {
         "count" = $count
     }
 
+    # Perform a web search using Bing with the user input and limit the results to 2
+    while ([string]::IsNullOrEmpty($Endpoint)) {
+        $Endpoint = Read-Host -Prompt "Please enter the AZURE Bing Web Search Endpoint"
+    }
+    [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $Endpoint, "User")
+    $endpoint += "v7.0/search"
+        
     try {
         # Make the API request to Bing Search
         $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -Body $params
@@ -1859,7 +1885,7 @@ To create effective queries for the Azure Bing Web Search API, follow these best
         Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
 
         if (-not [string]::IsNullOrEmpty($shortenedUserInput)) {
-            # Perform a web search using Bing with the user input and limit the results to 2
+
             $webResults = Invoke-BingWebSearch -query $shortenedUserInput -count $MaxCount
         }
         else {
@@ -1906,6 +1932,7 @@ $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
 [void]([Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US'))
 
 # Disable RAG (Retrieve and Generate) functionality if the NORAG switch is set
+$RAG = $true
 if ($NORAG) {
     $RAG = $false
 }
@@ -1934,6 +1961,7 @@ $GlobalState.LogFolder = $LogFolder
 
 # Disabe PSAOAI importing banner
 [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
+$env:PSAOAI_BANNER = "0"
 
 if ((Get-Module -ListAvailable -Name PSAOAI | Where-Object { [version]$_.version -ge [version]"0.3.0" })) {
     [void](Import-module -name PSAOAI -Force)
