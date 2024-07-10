@@ -6,7 +6,7 @@
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.0.2[unpublished]: check module version of PSAOAI, ollama checks, ollama simple manager
+3.0.2: check module version of PSAOAI, ollama checks, ollama auto manager.
 3.0.1: implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
 2.1.2: minor fixes.
 2.1.1: move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
@@ -1546,7 +1546,7 @@ function Invoke-LLMChatCompletion {
         # Display prompts if VerbosePrompt is enabled
         if ($GlobalState.VerbosePrompt) {
             Write-Host $SystemPrompt -ForegroundColor DarkMagenta
-            Write-Host $UserPrompt -ForegroundColor DarkYellow
+            Write-Host $UserPrompt -ForegroundColor DarkMagenta
         }
 
         # Handle different LLM providers
@@ -1558,7 +1558,9 @@ function Invoke-LLMChatCompletion {
                     $stream = $false
                     $script:GlobalState.Stream = $false
                 }
-                return Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
+                $response = Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
+                #Write-Host $response -ForegroundColor White
+                return $response
             }
             "LMStudio" {
                 if ($Stream) {
@@ -1660,7 +1662,7 @@ function Invoke-AIPSTeamOllamaCompletion {
         options = $ollamaOptiona
         stream  = $stream
     } | ConvertTo-Json
-    Write-Information "++ Ollama ($($script:ollamamodel)) is working..." -InformationAction Continue
+    Write-Host "++ Ollama ($($script:ollamamodel)) is working..."
     $response = Invoke-WebRequest -Method POST -Body $ollamajson -uri "http://localhost:11434/api/generate"
     # Log the prompt and response to the log file
     $logEntry = @{
@@ -1670,13 +1672,20 @@ function Invoke-AIPSTeamOllamaCompletion {
         Response     = ($response).Content
     } | ConvertTo-Json
     
-    $this.Log.Add($logEntry)
+    ##$this.Log.Add($logEntry)
     # Log the summary
-    $this.AddLogEntry("SystemPrompt:`n$SystemPrompt")
-    $this.AddLogEntry("UserPrompt:`n$UserPrompt")
-    $this.AddLogEntry("Response:`n$Response")
-
-    return ($response).Content | convertfrom-json | Select-Object -ExpandProperty response
+    ##$this.AddLogEntry("SystemPrompt:`n$SystemPrompt")
+    ##$this.AddLogEntry("UserPrompt:`n$UserPrompt")
+    ##$this.AddLogEntry("Response:`n$Response")
+    #Write-Host $response -ForegroundColor White
+    #Write-Host (($response).Content | convertfrom-json).response -ForegroundColor red
+    #throw
+    #return ($response).Content | convertfrom-json | Select-Object -ExpandProperty response
+    #write-Host "x"
+    $response = $($(($response).Content | convertfrom-json).response).trim()
+    #write-host (($response | gm) | out-string)
+    $response = $response.Trim('"')
+    return $response
 }
 
 function Invoke-AIPSTeamLMStudioChatCompletion {
@@ -1897,10 +1906,9 @@ function Invoke-RAG {
 To create effective query for the Azure Bing Web Search API, summarize given text and follow these best practices:
 1. Use specific keywords: Choose concise and precise terms that clearly define your search intent to increase result relevance.
 2. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine your queries. Use 'site:' for domain-specific searches.
-3. Encode query parameters: Use encodeURIComponent() to properly escape invalid characters in the query string.
-4. Do not enclose the query in quotation marks or other characters.
+3. Must remove from the begin and end of query quotation marks or other characters.
 "@
-        $shortenedUserInput = $RAGAgent.ProcessInput("You must summarize and craft short qury with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'.", "Assistant is a Web Search Query Manager. The task is to create search query. $websearchinstructions")
+        $shortenedUserInput = $RAGAgent.ProcessInput("You must summarize and craft short qury with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'.", "Assistant is a Web Search Query Manager. Assistant task is to create one search query only from summarized text. $websearchinstructions`n`n. Must not use query quotation marks.")
 
         Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
 
@@ -1973,11 +1981,47 @@ function Get-Ollama {
     $ollamaProcess = Get-Process ollama -ErrorAction SilentlyContinue
     if (-not $ollamaProcess) {
         Write-Host "Ollama is not currently running."
-        return $false
+        Start-OllamaInNewConsole
+        return $true
     }
     Write-Host "Ollama is running with PID: $($ollamaProcess.Id)"
 
     # Check what model is running
+    try {
+        Get-OllamaModels
+    }
+    catch {
+        Write-Host "Failed to retrieve model information from /api/tags: $_"
+        return $false
+    }
+
+    # Additional check for running model information
+    try {
+        # Example usage of Test-OllamaRunningModel and Start-OllamaModel
+        # Test-OllamaRunningModel checks if any model is running
+        # Start-OllamaModel starts a model if none is running
+        return Start-OllamaModel
+    }
+    catch {
+        Write-Host "Failed to retrieve additional model information from /api/ps: $_"
+    }
+}
+
+function Get-OllamaModels {
+    <#
+    .SYNOPSIS
+        Lists all available models in the local Ollama repository.
+
+    .DESCRIPTION
+        This function retrieves and lists all models available in the local Ollama repository by making a GET request to the /api/tags endpoint.
+
+    .EXAMPLE
+        List-OllamaModels
+
+    .NOTES
+        Author: YourName
+        Date: 2024.07.10
+    #>
     try {
         # Make a GET request to the /api/tags endpoint to retrieve model information
         $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -Method Get
@@ -1997,16 +2041,40 @@ function Get-Ollama {
         Write-Host "Failed to retrieve model information from /api/tags: $_"
         return $false
     }
+}
 
-    # Additional check for running model information
+function Start-OllamaInNewConsole {
+    <#
+    .SYNOPSIS
+        Starts Ollama in a new minimized console window.
+
+    .DESCRIPTION
+        This function starts the Ollama application in a new minimized console window using the Start-Process cmdlet.
+        It ensures that Ollama is installed and available in the system PATH before attempting to start it.
+
+    .EXAMPLE
+        Start-OllamaInNewConsole
+
+    .NOTES
+        Author: YourName
+        Date: 2024.07.10
+    #>
+    # Check if Ollama is installed
+    $ollamaPath = Get-Command ollama -ErrorAction SilentlyContinue
+    if (-not $ollamaPath) {
+        #Write-Host "Ollama is not installed or not in PATH."
+        return $false
+    }
+
+    # Start Ollama in a new minimized console window
     try {
-        # Example usage of Test-OllamaRunningModel and Start-OllamaModel
-        # Test-OllamaRunningModel checks if any model is running
-        # Start-OllamaModel starts a model if none is running
-        return Start-OllamaModel
+        Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "$ollamaPath start" -WindowStyle Minimized
+        Write-Host "Ollama has been started in a new minimized console window."
+        return $true
     }
     catch {
-        Write-Host "Failed to retrieve additional model information from /api/ps: $_"
+        Write-Host "Failed to start Ollama in a new minimized console window: $_"
+        return $false
     }
 }
 
@@ -2092,16 +2160,18 @@ function Start-OllamaModel {
 
             # Prompt the user to select a model to start
             $ModelName = $null
-            while (-not $ModelName) {
+            Get-OllamaModels
+            do {
                 $ModelName = Read-Host "Please enter the name of the model you want to start"
                 if ($models -notcontains $ModelName) {
                     Write-Host "Invalid model name. Please select a model from the list."
                     $ModelName = $null
                 }
-            }
+            } while (-not $ModelName)
 
             # Start the selected model using a new PowerShell process
-            Start-Process powershell -ArgumentList "-NoExit", "-Command", "& '$ollamaPath' run $ModelName"
+            #Start-Process powershell -ArgumentList "-NoExit", "-Command", "& '$ollamaPath' run $ModelName"
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "$ollamaPath run $ModelName" -WindowStyle Minimized
             return $ModelName
         }
         else {
@@ -2185,6 +2255,7 @@ if ($LLMProvider -eq "ollama" -and -not [string]::IsNullOrEmpty($env:OLLAMA_MODE
             $script:ollamaModel = $runningModelOllama
             break
         }
+        Start-OllamaModel
         Start-Sleep -Seconds 2
         $attempts++
     } while ($attempts -lt 10)
@@ -2537,7 +2608,7 @@ if (-not $GlobalState.NOLog) {
 
 $RAGpromptAddon = $null
 if ($GlobalState.RAG) {
-    $RAGresponse = Invoke-RAG -userInput $userInput -prompt "The assistant must analyze the provided text through the prism of the description provided by the user: '$userInput' and present a list of key information, thoughts and questions." -RAGAgent $projectManager
+    $RAGresponse = Invoke-RAG -userInput $userInput -prompt "The assistant must remove advertising elements, menus and other unimportant objects from the provided text and analyze the remaining body through the prism of the description provided by the user: '$userInput'. The result is to be a list of key information, thoughts and questions based on the text." -RAGAgent $projectManager
     if ($RAGresponse) {
         $RAGpromptAddon = @"
 
