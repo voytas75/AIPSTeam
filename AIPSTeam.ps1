@@ -1,11 +1,12 @@
 <#PSScriptInfo
-.VERSION 3.0.3
+.VERSION 3.0.4
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
+3.0.4[unpublished]:
 3.0.3: Corrected log entry method usage
 3.0.2: check module version of PSAOAI, ollama checks, ollama auto manager.
 3.0.1: implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
@@ -88,7 +89,7 @@ PS> "A PowerShell project to monitor CPU usage and display dynamic graph." | .\A
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.0.3
+Version: 3.0.4
 Author: voytas75
 Creation Date: 05.2024
 Purpose/Change: Initial release for emulating teamwork within PowerShell scripting context, rest in PSScriptInfo Releasenotes.
@@ -138,7 +139,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.0.3"
+$AIPSTeamVersion = "3.0.4"
 
 #region ProjectTeamClass
 <#

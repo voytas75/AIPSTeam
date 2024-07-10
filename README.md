@@ -145,14 +145,13 @@ To configure the script to use external providers, you need to set the following
 
 
 2. **Ollama**:
-   - `OLLAMA_API_KEY`: Your Ollama API key.
-   - `OLLAMA_API_ENDPOINT`: Your Ollama API endpoint.
+   - `OLLAMA_MODEL`: Your Ollama API key.
 
    Example:
 
    ```powershell
-   $env:OLLAMA_API_KEY="your-ollama-api-key"
-   $env:OLLAMA_API_ENDPOINT="https://your-ollama-endpoint"
+   $env:OLLAMA_MODEL="<ollama model, example: phi3:latest>"
+   
    ```
 
 3. **LM Studio**:
