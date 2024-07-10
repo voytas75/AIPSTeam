@@ -1556,6 +1556,7 @@ function Invoke-LLMChatCompletion {
                     Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
                     $script:stream = $false
                     $stream = $false
+                    $script:GlobalState.Stream = $false
                 }
                 return Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
             }
@@ -1564,6 +1565,7 @@ function Invoke-LLMChatCompletion {
                     Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
                     $script:stream = $false
                     $stream = $false
+                    $script:GlobalState.Stream = $false
                 }
                 $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey "lm-studio" -endpoint "http://localhost:1234/v1/chat/completions"
                 return $response
@@ -2175,7 +2177,7 @@ if ($LLMProvider -eq "ollama" -and -not [string]::IsNullOrEmpty($env:OLLAMA_MODE
     # Test if the Ollama model is running in a loop and if yes, proceed
     $ollamaModelRunning = $false
     $attempts = 0
-    while ($attempts -lt 10 -and (-not $runningModelOllama)) {
+    do {
         $runningModelOllama = Test-OllamaRunningModel
         if ($runningModelOllama) {
             $ollamaModelRunning = $true
@@ -2185,11 +2187,14 @@ if ($LLMProvider -eq "ollama" -and -not [string]::IsNullOrEmpty($env:OLLAMA_MODE
         }
         Start-Sleep -Seconds 2
         $attempts++
-    }
+    } while ($attempts -lt 10)
 
     if (-not $ollamaModelRunning) {
-        Write-Warning "Ollama model is not running after multiple attempts."
-        return
+        Write-Warning "Ollama model is not running after multiple attempts. Waiting 15 sec...."
+        for ($i = 1; $i -le 15; $i++) {
+            Write-Progress -Activity "Waiting for Ollama model to start" -Status "$i seconds elapsed" -PercentComplete (($i / 15) * 100)
+            Start-Sleep -Seconds 1
+        }
     }
 }
 elseif ($LLMProvider -eq "ollama") {
