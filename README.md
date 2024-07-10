@@ -147,7 +147,7 @@ To configure the script to use external providers, you need to set the following
 2. **Ollama**:
    - `OLLAMA_MODEL`: Your Ollama API key.
 
-   > [!NOTE]
+   > [!IMPORTANT]
    > For the **Ollama** provider, you do not need to manually define the `OLLAMA_MODEL` environment variable. The script will automatically check the status of Ollama and interactively prompt you to start and choose the model to use if it is not already running. This ensures a seamless setup process and reduces the need for manual configuration.
 
    Example:
