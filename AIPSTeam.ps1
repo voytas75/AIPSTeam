@@ -6,7 +6,7 @@
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.0.1[unpublished]: implement RAG based on Bing Web search API, add method to class, extend globalstate for all params.
+3.0.1: implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
 2.1.2: minor fixes.
 2.1.1: move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
 2.0.1: add abstract layer for LLM providers, fix update of lastPSDevCode, ann NOTips, Updated error handling, Added VerbosePrompt switch.
