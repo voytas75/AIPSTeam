@@ -112,7 +112,11 @@ To configure the script to use external providers, you need to set the following
    - `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`: Your Azure OpenAI Chat Completion deployment name.
    - `PSAOAI_BANNER`: Disable PSAOAI banner. AIPSTeam sets to "0".
 
-   When you start the script, you will be prompted to provide these environment variables if they are not already set. Alternatively, you can set them earlier to avoid prompts during execution.
+   When you start the script, you will be prompted to provide these environment variables if they are not already set. Alternatively, you can set them earlier to avoid prompts during execution. Additionally, ensure that you have the latest version of the [PSAOAI](https://img.shields.io/powershellgallery/dt/PSAOAI) module installed to avoid compatibility issues. You can check for updates and install the latest version using the following command:
+
+   ```powershell
+   Install-Module -Name PSAOAI
+   ```
 
    Example:
 
