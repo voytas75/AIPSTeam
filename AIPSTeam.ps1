@@ -100,6 +100,9 @@ param(
 
     [Parameter(Mandatory = $false, HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
     [bool] $Stream = $true,
+    
+    [Parameter(Mandatory = $false, HelpMessage = "Disables the RAG (Retrieve and Generate) functionality.")]
+    [switch] $NORAG,
 
     [Parameter(Mandatory = $false, HelpMessage = "Disables the Project Manager functions when used.")]
     [switch] $NOPM,
@@ -130,10 +133,7 @@ param(
 
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
-    [string]$LLMProvider = "AzureOpenAI",
-
-    [Parameter(Mandatory = $false, HelpMessage = "Enables the RAG (Retrieve and Generate) functionality.")]
-    [switch] $RAG
+    [string]$LLMProvider = "AzureOpenAI"
 )
 $AIPSTeamVersion = "3.0.1"
 
@@ -716,9 +716,10 @@ function Show-Banner {
    | $$  | $$ /$$$$$$| $$      |  $$$$$$/   | $$|  $$$$$$$|  $$$$$$$| $$ | $$ | $$
    |__/  |__/|______/|__/       \______/    |__/ \_______/ \_______/|__/ |__/ |__/ 
                                                                                   
-   AI PowerShell Team                                     powered by PSAOAI Module
+   AI PowerShell Team with RAG                            powered by PSAOAI Module
                                                                      Ollama
                                                                      LM Studio
+                                                                     AZURE Bing Web
    https://github.com/voytas75/AIPSTeam
   
 '@
@@ -1842,10 +1843,18 @@ function Invoke-RAG {
         [int]$MaxCount = 2
     )
     $RAGresponse = $null
+    $shortenedUserInput = ""
     try {
 
         # Shorten the user input to be used as a query for Bing search
-        $shortenedUserInput = $RAGAgent.ProcessInput("You must craft short a few terms optimized Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing, analyzing','Powershell, code, psscriptanalyzer','Powershell'. Do not enclose the query in quotation marks or other characters.", "Assistant is a Web Search Query Manager. The task is to create search query.")
+        $websearchinstructions = @"
+To create effective queries for the Azure Bing Web Search API, follow these best practices:
+1. Use specific keywords: Choose concise and precise terms that clearly define your search intent to increase result relevance.
+2. Employ quotes for exact matches: Enclose phrases in quotes when searching for an exact sequence of words.
+3. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine your queries. Use 'site:' for domain-specific searches.
+4. Encode query parameters: Use encodeURIComponent() to properly escape invalid characters in the query string.
+"@
+        $shortenedUserInput = $RAGAgent.ProcessInput("You must craft short a few terms optimized Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing, analyzing','Powershell, code, psscriptanalyzer','Powershell'. Do not enclose the query in quotation marks or other characters.", "Assistant is a Web Search Query Manager. The task is to create search query. $websearchinstructions")
 
         Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
 
@@ -1890,9 +1899,17 @@ function Invoke-RAG {
 #endregion Functions
 
 #region Setting Up
-
+# Save the original UI culture to restore it later
 $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
-[Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US')
+
+# Set the current UI culture to 'en-US' for consistent behavior
+[void]([Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US'))
+
+# Disable RAG (Retrieve and Generate) functionality if the NORAG switch is set
+if ($NORAG) {
+    $RAG = $false
+}
+
 
 # Define a state management object
 $GlobalState = [PSCustomObject]@{
@@ -2407,17 +2424,18 @@ do {
     Write-Host "8. Save Project State"
     Write-Host "9. Code Refactoring Suggestions"
     Write-Host "10. Security Audit"
-    Write-Host "11. (Q)uit"
+    Write-Host "11. Open project folder in file explorer"
     if (Test-Path -Path (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")) {
-        Write-Host "E. Display content of (e)rror.txt"
+        Write-Host "(E) Display content of (e)rror.txt"
     }
+    Write-Host "(Q)uit"
 
     # Get the user's choice
     $userOption = Read-Host -Prompt "Enter your choice"
     Write-Output ""
 
     # Process the user's choice if it's not 'Q' or '9' (both of which mean 'quit')
-    if ($userOption -ne 'Q' -and $userOption -ne "11") {
+    if ($userOption -ne 'Q') {
         switch ($userOption) {
             '1' {
                 # Option 1: Suggest a new feature, enhancement, or change
@@ -2683,6 +2701,22 @@ do {
                     Write-Output "Security improvements were not deployed."
                 }
             }
+            '11' {
+                # Option 11: Open project folder in file explorer
+                Show-Header -HeaderText "Open Project Folder in File Explorer"
+                try {
+                    if ($GlobalState.TeamDiscussionDataFolder) {
+                        Start-Process explorer.exe -ArgumentList $GlobalState.TeamDiscussionDataFolder
+                        Write-Host "Project folder opened in File Explorer."
+                    }
+                    else {
+                        Write-Host "-- The project folder path is not set. Please ensure the TeamDiscussionDataFolder is defined."
+                    }
+                }
+                catch {
+                    Write-Error "-- An error occurred while trying to open the project folder: $_"
+                }
+            }
             'e' {
                 if (Test-Path -Path (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")) {
                     $errorContent = Get-Content -Path (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt") -Raw
@@ -2700,7 +2734,7 @@ do {
             }
         }
     }
-} while ($userOption -ne 'Q' -and $userOption -ne "11" ) # End the loop when the user chooses to quit
+} while ($userOption -ne 'Q') # End the loop when the user chooses to quit
 #endregion Menu
 
 #region PM Project report
