@@ -167,17 +167,18 @@ To configure the script to use external providers, you need to set the following
 
 4. **RAG Configuration**:
    - `AZURE_BING_API_KEY`: Your Azure Bing Web Search API key.
-   - `AZURE_BING_ENDPOINT`: Your Azure Bing Web Search endpoint.
+   - `AZURE_BING_ENDPOINT`: Your Azure Bing Web Search endpoint. ()
 
    Example:
 
    ```powershell
    $env:AZURE_BING_API_KEY="your-azure-bing-api-key"
-   $env:AZURE_BING_ENDPOINT="https://api.bing.microsoft.com/v7.0/search"
+   $env:AZURE_BING_ENDPOINT="https://api.bing.microsoft.com/"
    ```
 
-Ensure these environment variables are set before running the script to enable the respective functionalities.
+[Bing Search API documentation](https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/)
 
+Ensure these environment variables are set before running the script to enable the respective functionalities.
 
 ### Usage
 
