@@ -6,7 +6,7 @@
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.0.2[unpublished]: 
+3.0.2[unpublished]: check module version of PSAOAI, ollama checks, ollama simple manager
 3.0.1: implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
 2.1.2: minor fixes.
 2.1.1: move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
@@ -549,6 +549,23 @@ class ProjectTeam {
 #endregion ProjectTeamClass
 
 #region Functions
+function Test-ModuleMinVersion {
+    param (
+        [string]$ModuleName,
+        [version]$MinimumVersion
+    )
+
+    $module = Get-Module -ListAvailable -Name $ModuleName | 
+    Where-Object { $_.Version -ge $MinimumVersion } | 
+    Select-Object -First 1
+
+    if ($module) {
+        return $true
+    }
+    else {
+        return $false
+    }
+}
 function SendFeedbackRequest {
     param (
         [string] $TeamMember, # The team member to send the feedback request to
@@ -709,8 +726,8 @@ function Show-Banner {
     Write-Host @'
  
 
-     /$$$$$$  /$$$$$$ /$$$$$$$   /$$$$$$  /$$$$$$$$                               
-    /$$__  $$|_  $$_/| $$__  $$ /$$__  $$|__  $$__/                               
+     /$$$$$$  /$$$$$$ /$$$$$$$   /$$$$$$  /$$$$$$$$ 
+    /$$__  $$|_  $$_/| $$__  $$ /$$__  $$|__  $$__/ Retrieval-Augmented Generation                          
    | $$  \ $$  | $$  | $$  \ $$| $$  \__/   | $$  /$$$$$$   /$$$$$$  /$$$$$$/$$$$ 
    | $$$$$$$$  | $$  | $$$$$$$/|  $$$$$$    | $$ /$$__  $$ |____  $$| $$_  $$_  $$
    | $$__  $$  | $$  | $$____/  \____  $$   | $$| $$$$$$$$  /$$$$$$$| $$ \ $$ \ $$
@@ -1875,13 +1892,13 @@ function Invoke-RAG {
 
         # Shorten the user input to be used as a query for Bing search
         $websearchinstructions = @"
-To create effective queries for the Azure Bing Web Search API, follow these best practices:
+To create effective query for the Azure Bing Web Search API, summarize given text and follow these best practices:
 1. Use specific keywords: Choose concise and precise terms that clearly define your search intent to increase result relevance.
-2. Employ quotes for exact matches: Enclose phrases in quotes when searching for an exact sequence of words.
-3. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine your queries. Use 'site:' for domain-specific searches.
-4. Encode query parameters: Use encodeURIComponent() to properly escape invalid characters in the query string.
+2. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine your queries. Use 'site:' for domain-specific searches.
+3. Encode query parameters: Use encodeURIComponent() to properly escape invalid characters in the query string.
+4. Do not enclose the query in quotation marks or other characters.
 "@
-        $shortenedUserInput = $RAGAgent.ProcessInput("You must craft short a few terms optimized Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing, analyzing','Powershell, code, psscriptanalyzer','Powershell'. Do not enclose the query in quotation marks or other characters.", "Assistant is a Web Search Query Manager. The task is to create search query. $websearchinstructions")
+        $shortenedUserInput = $RAGAgent.ProcessInput("You must summarize and craft short qury with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'.", "Assistant is a Web Search Query Manager. The task is to create search query. $websearchinstructions")
 
         Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
 
@@ -1923,9 +1940,184 @@ To create effective queries for the Azure Bing Web Search API, follow these best
         return
     }
 }
+
+function Get-Ollama {
+    <#
+.SYNOPSIS
+    Checks the status of Ollama installation, process, and running models.
+
+.DESCRIPTION
+    This function performs several checks related to Ollama:
+    1. Verifies if Ollama is installed and available in the system PATH.
+    2. Checks if the Ollama process is currently running.
+    3. Retrieves and displays information about the models currently running in Ollama.
+
+.EXAMPLE
+    Get-Ollama
+
+.NOTES
+    Author: Voytas75
+    Date: 2024.07.10
+#>
+    # Check if Ollama is installed
+    $ollamaPath = Get-Command ollama -ErrorAction SilentlyContinue
+    if (-not $ollamaPath) {
+        Write-Host "Ollama is not installed or not in PATH."
+        return $false
+    }
+    Write-Host "Ollama is installed at: $($ollamaPath.Source)"
+
+    # Check if Ollama is running
+    $ollamaProcess = Get-Process ollama -ErrorAction SilentlyContinue
+    if (-not $ollamaProcess) {
+        Write-Host "Ollama is not currently running."
+        return $false
+    }
+    Write-Host "Ollama is running with PID: $($ollamaProcess.Id)"
+
+    # Check what model is running
+    try {
+        # Make a GET request to the /api/tags endpoint to retrieve model information
+        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -Method Get
+        if ($response.models) {
+            Write-Host "Models:"
+            # Iterate through each model and output its name and size
+            $response.models | ForEach-Object {
+                Write-Host "- $($_.name) (Size: $($_.size))"
+            }
+        }
+        else {
+            Write-Host "No models in local repository."
+            return $false
+        }
+    }
+    catch {
+        Write-Host "Failed to retrieve model information from /api/tags: $_"
+        return $false
+    }
+
+    # Additional check for running model information
+    try {
+        # Example usage of Test-OllamaRunningModel and Start-OllamaModel
+        # Test-OllamaRunningModel checks if any model is running
+        # Start-OllamaModel starts a model if none is running
+        return Start-OllamaModel
+    }
+    catch {
+        Write-Host "Failed to retrieve additional model information from /api/ps: $_"
+    }
+}
+
+function Test-OllamaRunningModel {
+    <#
+.SYNOPSIS
+    Tests if any models are currently running in Ollama and retrieves their information.
+
+.DESCRIPTION
+    This function checks if any models are currently running in Ollama by making a GET request to the /api/ps endpoint.
+    If models are running, it outputs their names and sizes. If no models are running, it provides instructions on how to start a model.
+
+.EXAMPLE
+    Test-OllamaRunningModel
+
+.NOTES
+    Author: Voytas75
+    Date: 2024.07.10
+#>
+    try {
+        # Make a GET request to the /api/ps endpoint to retrieve running model information
+        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/ps" -Method Get
+        
+        if ($response.models) {
+            Write-Host "Ollama is running the following model:"
+            # Iterate through each model and output its name and size
+            $response.models | ForEach-Object {
+                Write-Host "- $($_.name) (Size: $($_.size))"
+                return $_.name
+            }
+        }
+        else {
+            Write-Host "No models are currently running in Ollama."
+            #Write-Host "To run a model in Ollama, use the following command:"
+            #Write-Host "ollama run <model-name>"
+            return $false
+        }
+    }
+    catch {
+        Write-Host "Failed to retrieve model information from Ollama: $_"
+    }
+}
+
+function Start-OllamaModel {
+    <#
+.SYNOPSIS
+    Starts a model in Ollama if no model is currently running.
+
+.DESCRIPTION
+    This function checks if Ollama is installed and available in the system PATH. 
+    It then verifies if any model is currently running in Ollama. If no model is running, 
+    it prompts the user to select a model from the available models and starts it.
+
+.EXAMPLE
+    Start-OllamaModel
+
+.NOTES
+    Author: Voytas75
+    Date: 2024.07.10
+#>
+    # Get the path of the Ollama executable
+    $ollamaPath = (Get-Command ollama -ErrorAction SilentlyContinue).Source
+    if (-not $ollamaPath) {
+        Write-Host "Ollama is not found in PATH. Make sure it's installed and in your system PATH."
+        return $false
+    }
+
+    try {
+        # Check if any model is currently running
+        $runningModel = Test-OllamaRunningModel
+        if ($runningModel) {
+            Write-Host "Model '$runningModel' is already running."
+            return $runningModel
+        }
+
+        # Make a GET request to the /api/tags endpoint to retrieve available models
+        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -Method Get
+        if ($response.models) {
+            #Write-Host "Available Models:"
+            # List available models
+            $models = $response.models | ForEach-Object { $_.name }
+            #$models | ForEach-Object { Write-Host "- $_" }
+
+            # Prompt the user to select a model to start
+            $ModelName = $null
+            while (-not $ModelName) {
+                $ModelName = Read-Host "Please enter the name of the model you want to start"
+                if ($models -notcontains $ModelName) {
+                    Write-Host "Invalid model name. Please select a model from the list."
+                    $ModelName = $null
+                }
+            }
+
+            # Start the selected model using a new PowerShell process
+            Start-Process powershell -ArgumentList "-NoExit", "-Command", "& '$ollamaPath' run $ModelName"
+            return $ModelName
+        }
+        else {
+            Write-Host "No models are currently available."
+        }
+    }
+    catch {
+        Write-Host "Failed to retrieve model information from /api/tags: $_"
+    }
+}
 #endregion Functions
 
 #region Setting Up
+# Check if the PSAOAI module is installed and meets the minimum version requirement
+#if (-not (Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion 0.3.2) -and $LLMProvider -eq "AzureOpenAI") {
+#    Write-Host "The PSAOAI module is not at the required version (0.3.2). Please update it using 'Update-Module PSAOAI' or install it using 'Install-Module PSAOAI'." #-ForegroundColor Yellow
+#}
+
 # Save the original UI culture to restore it later
 $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
 
@@ -1964,14 +2156,54 @@ $GlobalState.LogFolder = $LogFolder
 [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
 $env:PSAOAI_BANNER = "0"
 
-if ((Get-Module -ListAvailable -Name PSAOAI | Where-Object { [version]$_.version -ge [version]"0.3.0" })) {
+if ((Get-Module -ListAvailable -Name PSAOAI | Where-Object { [version]$_.version -ge [version]"0.3.2" })) {
     [void](Import-module -name PSAOAI -Force)
 }
 else {
-    Write-Warning "-- You need to install/update PSAOAI module version >= 0.2.1. Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
+    Write-Warning "-- You need to install/update PSAOAI module version >= 0.3.2. Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
     return
 }
 Show-Banner
+
+if ($LLMProvider -eq "ollama" -and -not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
+    # Run the check
+    $runningModelOllama = Get-Ollama
+    if ($runningModelOllama) {
+        $env:OLLAMA_MODEL = $runningModelOllama
+        $script:ollamaModel = $runningModelOllama
+    } 
+    # Test if the Ollama model is running in a loop and if yes, proceed
+    $ollamaModelRunning = $false
+    $attempts = 0
+    while ($attempts -lt 10 -and (-not $runningModelOllama)) {
+        $runningModelOllama = Test-OllamaRunningModel
+        if ($runningModelOllama) {
+            $ollamaModelRunning = $true
+            $env:OLLAMA_MODEL = $runningModelOllama
+            $script:ollamaModel = $runningModelOllama
+            break
+        }
+        Start-Sleep -Seconds 2
+        $attempts++
+    }
+
+    if (-not $ollamaModelRunning) {
+        Write-Warning "Ollama model is not running after multiple attempts."
+        return
+    }
+}
+elseif ($LLMProvider -eq "ollama") {
+    # Run the check
+    $runningModelOllama = Get-Ollama
+    if (-not $runningModelOllama) {
+        $script:ollamaModel = Read-Host "Please provide the LLM model for ollama"
+    }
+    else {
+        $env:OLLAMA_MODEL = $runningModelOllama
+        $script:ollamaModel = $runningModelOllama
+    }
+}
+
 $scriptname = "AIPSTeam"
 if ($LoadProjectStatus) {
     # Check if the provided path is a directory
@@ -2282,13 +2514,6 @@ $Team += $projectManager
 
 foreach ($TeamMember in $Team) {
     $TeamMember.LLMProvider = $LLMProvider
-}
-
-if ($LLMProvider -eq "ollama" -and -not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
-    $script:ollamaModel = $env:OLLAMA_MODEL
-}
-elseif ($LLMProvider -eq "ollama") {
-    $script:ollamaModel = Read-Host "Please provide the LLM model for ollama"
 }
 
 if ($GlobalState.NOLog) {
