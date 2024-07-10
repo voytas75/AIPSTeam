@@ -109,10 +109,7 @@ To configure the script to use external providers, you need to set the following
    - `PSAOAI_API_AZURE_OPENAI_KEY`: Your Azure OpenAI API key.
    - `PSAOAI_API_AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI endpoint.
    - `PSAOAI_API_AZURE_OPENAI_APIVERSION`: The version of the Azure OpenAI API you want to use.
-   - `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`: Your Azure OpenAI CC deployment name.
-   - `PSAOAI_API_AZURE_OPENAI_C_DEPLOYMENT`: Your Azure OpenAI C deployment name.
-   - `PSAOAI_API_AZURE_OPENAI_D3_DEPLOYMENT`: Your Azure OpenAI D3 deployment name.
-   - `PSAOAI_API_AZURE_OPENAI_E_DEPLOYMENT`: Your Azure OpenAI E deployment name.
+   - `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`: Your Azure OpenAI Chat Completion deployment name.
    - `PSAOAI_BANNER`: Disable PSAOAI banner. AIPSTeam sets to "0".
 
    When you start the script, you will be prompted to provide these environment variables if they are not already set. Alternatively, you can set them earlier to avoid prompts during execution.
@@ -124,6 +121,10 @@ To configure the script to use external providers, you need to set the following
    $env:PSAOAI_API_AZURE_OPENAI_APIVERSION="2024-05-01-preview"
    $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT="your-deployment-name"
    ```
+
+> [!IMPORTANT]
+> The `PSAOAI_API_AZURE_OPENAI_KEY` environment variable cannot be provided manually because the PSAOAI module encrypts it for security purposes. Ensure that the key is set and managed through the PSAOAI module's secure mechanisms.
+
 
 2. **Ollama**:
    - `OLLAMA_API_KEY`: Your Ollama API key.
@@ -148,14 +149,12 @@ To configure the script to use external providers, you need to set the following
    ```
 
 4. **RAG Configuration**:
-   - `RAG_DATA_SOURCE`: The data source for retrieval-augmented generation.
    - `AZURE_BING_API_KEY`: Your Azure Bing Web Search API key.
    - `AZURE_BING_ENDPOINT`: Your Azure Bing Web Search endpoint.
 
    Example:
 
    ```powershell
-   $env:RAG_DATA_SOURCE="your-data-source"
    $env:AZURE_BING_API_KEY="your-azure-bing-api-key"
    $env:AZURE_BING_ENDPOINT="https://api.bing.microsoft.com/v7.0/search"
    ```
