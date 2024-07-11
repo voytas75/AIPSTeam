@@ -1976,19 +1976,18 @@ function Get-Ollama {
     Date: 2024.07.10
 #>
     # Check if Ollama is installed
-    $ollamaPath = Get-Command ollama -ErrorAction SilentlyContinue
+    $ollamaPath = Test-OllamaInstalled
     if (-not $ollamaPath) {
         Write-Host "Ollama is not installed or not in PATH."
         return $false
     }
-    Write-Host "Ollama is installed at: $($ollamaPath.Source)"
+    Write-Host "Ollama is installed at: $ollamaPath"
 
     # Check if Ollama is running
-    $ollamaProcess = Get-Process ollama -ErrorAction SilentlyContinue
+    $ollamaProcess = Test-OllamaRunning
     if (-not $ollamaProcess) {
         Write-Host "Ollama is not currently running."
-        Start-OllamaInNewConsole
-        return $true
+        return Start-OllamaInNewConsole
     }
     if ($ollamaProcess.Count -gt 1) {
         Write-Host "Multiple Ollama processes are running with PID(s): $($ollamaProcess.Id -join ', ')"
@@ -2043,7 +2042,7 @@ function Get-OllamaModels {
             }
         }
         else {
-            Write-Host "No models in local repository."
+            Write-Host "No models in local repository. https://github.com/ollama/ollama?tab=readme-ov-file#quickstart"
             return $false
         }
     }
@@ -2202,6 +2201,75 @@ function Start-OllamaModel {
         Write-Host "Failed to retrieve model information from /api/tags: $_"
     }
 }
+function Test-OllamaInstalled {
+    <#
+    .SYNOPSIS
+        Tests if Ollama is installed and available in the system PATH.
+
+    .DESCRIPTION
+        This function checks if the 'ollama' executable is available in the system PATH.
+        It returns $true if Ollama is installed, and $false otherwise.
+
+    .EXAMPLE
+        Test-OllamaInstalled
+        Returns $true if Ollama is installed, otherwise $false.
+
+    .NOTES
+        Author: YourName
+        Date: 2024.07.10
+    #>
+    param ()
+
+    try {
+        $ollamaPath = Get-Command ollama -ErrorAction SilentlyContinue
+        if ($ollamaPath) {
+            #Write-Host "Ollama is installed at: $($ollamaPath.Source)"
+            return $ollamaPath.Source
+        } else {
+            #Write-Host "Ollama is not installed or not in PATH."
+            return $false
+        }
+    }
+    catch {
+        Write-Host "An error occurred while checking for Ollama installation: $_"
+        return $false
+    }
+}
+
+function Test-OllamaRunning {
+    <#
+    .SYNOPSIS
+        Tests if the Ollama process is currently running.
+
+    .DESCRIPTION
+        This function checks if the 'ollama' process is currently running on the system.
+        It returns $true if the process is running, and $false otherwise.
+
+    .EXAMPLE
+        Test-OllamaRunning
+        Returns $true if the Ollama process is running, otherwise $false.
+
+    .NOTES
+        Author: YourName
+        Date: 2024.07.10
+    #>
+    param ()
+
+    try {
+        $ollamaProcess = Get-Process ollama -ErrorAction SilentlyContinue
+        if ($ollamaProcess) {
+            return $ollamaProcess
+        } else {
+            return $false
+        }
+    }
+    catch {
+        Write-Host "An error occurred while checking if Ollama is running: $_"
+        return $false
+    }
+}
+
+
 #endregion Functions
 
 #region Setting Up
@@ -2259,7 +2327,7 @@ Show-Banner
 
 #region ollama
 if ($LLMProvider -eq "ollama") {
-    $runningModelOllama = Get-Ollama
+    $runningModelOllama = Test-OllamaRunningModel
     if ($runningModelOllama) {
         $env:OLLAMA_MODEL = $runningModelOllama
         $script:ollamaModel = $runningModelOllama
@@ -2567,18 +2635,14 @@ $projectManager = [ProjectTeam]::new(
     "Manager",
     $projectManagerRole,
     @"
-You act as {0}. Your task is to provide a comprehensive summary of the PowerShell project based on the completed tasks of each expert. This includes:
+You act as {0}. Your task is to provide a comprehensive summary of the PowerShell project as project report, based on the completed tasks of each expert. This includes:
 - Reviewing the documented requirements from the Requirements Analyst.
 - Summarizing the architectural design created by the System Architect.
-- Detailing the script development work done by the PowerShell Developer.
+- Summarizing script development work done by the PowerShell Developer.
 - Reporting the testing results and issues found by the QA Engineer.
 - Highlighting the documentation prepared by the Documentation Specialist.
-- Compiling these summaries into a final project report.
-- Identifying key achievements, challenges faced, and lessons learned throughout the project.
+- Identifying key achievements.
 - Ensuring that all aspects of the project are covered and documented comprehensively.
-- Providing a clear and concise summary that reflects the overall progress and status of the project.
-- Including a section on risk management and mitigation strategies.
-- Ensuring regular updates and progress reports are included.
 - Conducting a post-project review and feedback session.
 "@ -f $projectManagerRole,
     0.7,
