@@ -4,9 +4,10 @@
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt
 .PROJECTURI https://github.com/voytas75/AIPSTeam
+.ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.1.1[unpublished]: moved PM exec, Test-ModuleMinVersion.
+3.1.1[unpublished]: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic.
 3.0.3: Corrected log entry method usage
 3.0.2: check module version of PSAOAI, ollama checks, ollama auto manager.
 3.0.1: implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
@@ -37,15 +38,16 @@
 
 <# 
 .SYNOPSIS 
-This script emulates a team of AI-powered specialists working together on a PowerShell project.
+Emulates a team of AI-powered Agents with RAG collaborating on a PowerShell project.
 
 .DESCRIPTION 
-The script simulates a team of AI-powered specialists, each with a unique role in executing a project. The user input is processed by one AI specialist who performs their task and passes the result to the next AI specialist. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
+This script simulates a team of AI-powered Agents with RAG, each with a unique role in executing a project. User input is processed by one AI specialist, who performs their task and passes the result to the next AI Agent. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
+
 .PARAMETER userInput 
-Defines the project outline as a string. Default is to monitor RAM usage and show a color block based on the load. This parameter can also accept input from the pipeline.
+Defines the project outline as a string. The default is to monitor RAM usage and show a color block based on the load. This parameter can also accept input from the pipeline.
 
 .PARAMETER Stream 
-Controls whether the output should be streamed live. Default is `$true`.
+Controls whether the output should be streamed live. The default is `$true`.
 
 .PARAMETER NOPM 
 Disables the Project Manager functions when used.
@@ -60,22 +62,25 @@ Disables the logging functions when used.
 Disables tips.
 
 .PARAMETER VerbosePrompt
-Show Prompts.
+Shows prompts.
 
 .PARAMETER LogFolder
 Specifies the folder where logs should be stored.
 
 .PARAMETER DeploymentChat
-Specifies the deployment chat environment variable for PSAOAI. Default is retrieved from the environment variable `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`.
+Specifies the deployment chat environment variable for PSAOAI. The default is retrieved from the environment variable `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`.
 
 .PARAMETER LoadProjectStatus
 Loads the project status from a specified path. Part of the 'LoadStatus' parameter set.
 
 .PARAMETER MaxTokens
-Specifies the maximum number of tokens to generate in the response. Default is 20480.
+Specifies the maximum number of tokens to generate in the response. The default is 20480.
 
 .PARAMETER LLMProvider
-Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
+Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). The default is "AzureOpenAI".
+
+.PARAMETER NORAG
+Disables the RAG (Retrieve and Generate) functionality.
 
 .INPUTS 
 System.String. You can pipe a string to the 'userInput' parameter.
@@ -92,11 +97,10 @@ This command runs the script without streaming output live (-Stream $false) and 
 Version: 3.1.1
 Author: voytas75
 Creation Date: 05.2024
-Purpose/Change: Initial release for emulating teamwork within PowerShell scripting context, rest in PSScriptInfo Releasenotes.
 
 .LINK
 https://www.powershellgallery.com/packages/AIPSTeam
-https://github.com/voytas75/AIPSTeam/README.md
+https://github.com/voytas75/AIPSTeam/
 #>
 param(
     [Parameter(Mandatory = $false, ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string.")]
@@ -120,7 +124,7 @@ param(
     [Parameter(Mandatory = $false, HelpMessage = "Disables tips.")]
     [switch] $NOTips,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Show Prompts.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Shows prompts.")]
     [switch] $VerbosePrompt,
 
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the folder where logs should be stored.")]
@@ -1910,7 +1914,7 @@ To create effective query for the Azure Bing Web Search API, summarize given tex
 2. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine your queries. Use 'site:' for domain-specific searches.
 3. Must remove from the begin and end of query quotation marks or other characters.
 "@
-        $shortenedUserInput = $RAGAgent.ProcessInput("You must summarize and craft short qury with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'.", "Assistant is a Web Search Query Manager. Assistant task is to create one search query only from summarized text. $websearchinstructions`n`n. Must not use query quotation marks.")
+        $shortenedUserInput = $RAGAgent.ProcessInput("You must summarize and craft short qury with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'. You must respond with query only.", "Assistant is a Web Search Query Manager. Assistant's task is to suggest best query. $websearchinstructions`n`n.")
 
         Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
 
@@ -1986,7 +1990,11 @@ function Get-Ollama {
         Start-OllamaInNewConsole
         return $true
     }
-    Write-Host "Ollama is running with PID: $($ollamaProcess.Id)"
+    if ($ollamaProcess.Count -gt 1) {
+        Write-Host "Multiple Ollama processes are running with PID(s): $($ollamaProcess.Id -join ', ')"
+    } else {
+        Write-Host "Ollama is running with PID: $($ollamaProcess.Id)"
+    }
 
     # Check what model is running
     try {
@@ -2160,16 +2168,26 @@ function Start-OllamaModel {
             $models = $response.models | ForEach-Object { $_.name }
             #$models | ForEach-Object { Write-Host "- $_" }
 
-            # Prompt the user to select a model to start
-            $ModelName = $null
-            Get-OllamaModels
-            do {
-                $ModelName = Read-Host "Please enter the name of the model you want to start"
+            # Check if the environment variable 'ollama_model' is set
+            if ($env:ollama_model) {
+                $ModelName = $env:ollama_model
                 if ($models -notcontains $ModelName) {
-                    Write-Host "Invalid model name. Please select a model from the list."
+                    Write-Host "Invalid model name specified in environment variable 'ollama_model'. Please select a model from the list."
                     $ModelName = $null
                 }
-            } while (-not $ModelName)
+            }
+
+            # If 'ollama_model' is not set or invalid, prompt the user to select a model
+            if (-not $ModelName) {
+                Get-OllamaModels
+                do {
+                    $ModelName = Read-Host "Please enter the name of the model you want to start"
+                    if ($models -notcontains $ModelName) {
+                        Write-Host "Invalid model name. Please select a model from the list."
+                        $ModelName = $null
+                    }
+                } while (-not $ModelName)
+            }
 
             # Start the selected model using a new PowerShell process
             #Start-Process powershell -ArgumentList "-NoExit", "-Command", "& '$ollamaPath' run $ModelName"
@@ -2239,48 +2257,42 @@ if (    Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
 }
 Show-Banner
 
-if ($LLMProvider -eq "ollama" -and -not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
-    # Run the check
+#region ollama
+if ($LLMProvider -eq "ollama") {
     $runningModelOllama = Get-Ollama
     if ($runningModelOllama) {
         $env:OLLAMA_MODEL = $runningModelOllama
         $script:ollamaModel = $runningModelOllama
-    } 
-    # Test if the Ollama model is running in a loop and if yes, proceed
-    $ollamaModelRunning = $false
-    $attempts = 0
-    do {
-        $runningModelOllama = Test-OllamaRunningModel
-        if ($runningModelOllama) {
-            $ollamaModelRunning = $true
-            $env:OLLAMA_MODEL = $runningModelOllama
-            $script:ollamaModel = $runningModelOllama
-            break
-        }
-        Start-OllamaModel
-        Start-Sleep -Seconds 2
-        $attempts++
-    } while ($attempts -lt 10)
-
-    if (-not $ollamaModelRunning) {
-        Write-Warning "Ollama model is not running after multiple attempts. Waiting 15 sec...."
-        for ($i = 1; $i -le 15; $i++) {
-            Write-Progress -Activity "Waiting for Ollama model to start" -Status "$i seconds elapsed" -PercentComplete (($i / 15) * 100)
-            Start-Sleep -Seconds 1
-        }
-    }
-}
-elseif ($LLMProvider -eq "ollama") {
-    # Run the check
-    $runningModelOllama = Get-Ollama
-    if (-not $runningModelOllama) {
+    } else {
         $script:ollamaModel = Read-Host "Please provide the LLM model for ollama"
     }
-    else {
-        $env:OLLAMA_MODEL = $runningModelOllama
-        $script:ollamaModel = $runningModelOllama
+
+    if (-not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
+        $ollamaModelRunning = $false
+        for ($attempts = 0; $attempts -lt 10; $attempts++) {
+            $runningModelOllama = Test-OllamaRunningModel
+            if ($runningModelOllama) {
+                $ollamaModelRunning = $true
+                $env:OLLAMA_MODEL = $runningModelOllama
+                $script:ollamaModel = $runningModelOllama
+                break
+            }
+            Start-OllamaModel
+            Start-Sleep -Seconds 2
+        }
+
+        if (-not $ollamaModelRunning) {
+            Write-Warning "Ollama model is not running after multiple attempts. Waiting 15 sec...."
+            for ($i = 1; $i -le 15; $i++) {
+                Write-Progress -Activity "Waiting for Ollama model to start" -Status "$i seconds elapsed" -PercentComplete (($i / 15) * 100)
+                Start-Sleep -Seconds 1
+            }
+        }
     }
+
+    Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value."
 }
+#endregion ollama
 
 $scriptname = "AIPSTeam"
 if ($LoadProjectStatus) {
