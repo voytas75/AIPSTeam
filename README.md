@@ -83,6 +83,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
    ```powershell
    Install-Module -Name PSAOAI
    Install-Module -Name PSScriptAnalyzer
+   Install-Module -Name powerHTML
    ```
 
 2. **Install the Script**: Install script from [Powershell Gallery](https://www.powershellgallery.com/packages/AIPSTeam).
@@ -367,6 +368,7 @@ Ensure these environment variables are set before running the script to enable t
    ```powershell
    Install-Module -Name PSAOAI
    Install-Module -Name PSScriptAnalyzer
+   Install-Module -Name powerHTML
    ```
 
 2. **How do I disable live streaming?**
