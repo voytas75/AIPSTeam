@@ -1,12 +1,12 @@
 <#PSScriptInfo
-.VERSION 3.0.4
+.VERSION 3.1.1
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.0.4[unpublished]:
+3.1.1[unpublished]: moved PM exec, Test-ModuleMinVersion.
 3.0.3: Corrected log entry method usage
 3.0.2: check module version of PSAOAI, ollama checks, ollama auto manager.
 3.0.1: implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
@@ -89,7 +89,7 @@ PS> "A PowerShell project to monitor CPU usage and display dynamic graph." | .\A
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.0.4
+Version: 3.1.1
 Author: voytas75
 Creation Date: 05.2024
 Purpose/Change: Initial release for emulating teamwork within PowerShell scripting context, rest in PSScriptInfo Releasenotes.
@@ -139,7 +139,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.0.4"
+$AIPSTeamVersion = "3.1.1"
 
 #region ProjectTeamClass
 <#
@@ -2230,10 +2230,10 @@ $GlobalState.LogFolder = $LogFolder
 [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
 $env:PSAOAI_BANNER = "0"
 
-if ((Get-Module -ListAvailable -Name PSAOAI | Where-Object { [version]$_.version -ge [version]"0.3.2" })) {
+#if ((Get-Module -ListAvailable -Name PSAOAI | Where-Object { [version]$_.version -ge [version]"0.3.2" })) {
+if (    Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
     [void](Import-module -name PSAOAI -Force)
-}
-else {
+} else {
     Write-Warning "-- You need to install/update PSAOAI module version >= 0.3.2. Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
     return
 }
@@ -2733,6 +2733,19 @@ $examplePScode
         Add-ToGlobalResponses $GlobalState $documentationSpecialistResponce
     }
     #endregion Doc
+
+    #region PM Project report
+    if (-not $GlobalState.NOPM) {
+        # Example of summarizing all steps,  Log final response to file
+        if (-not $GlobalState.NOLog) {
+            $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ") | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
+        }
+        else {
+            $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ")
+        }
+        Add-ToGlobalResponses $GlobalState $projectManagerResponse
+    }
+    #endregion PM Project report
 }
 #region Menu
 
@@ -3068,19 +3081,6 @@ do {
     }
 } while ($userOption -ne 'Q') # End the loop when the user chooses to quit
 #endregion Menu
-
-#region PM Project report
-if (-not $GlobalState.NOPM) {
-    # Example of summarizing all steps,  Log final response to file
-    if (-not $GlobalState.NOLog) {
-        $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ") | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
-    }
-    else {
-        $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ")
-    }
-    Add-ToGlobalResponses $GlobalState $projectManagerResponse
-}
-#endregion PM Project report
 
 #region Final code
 if (-not $GlobalState.NOLog) {
