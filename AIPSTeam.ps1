@@ -1626,7 +1626,7 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
 
 
         # Call Azure OpenAI API
-        #$response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -MaxTokens $MaxTokens -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat -simpleresponse:$simpleresponse -OneTimeUserPrompt:$OneTimeUserPrompt
+        Write-Host "++ AZURE OpenaAI ($Deployment) is working..."
         $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt 
 
         # Check if the response is null or empty
@@ -1991,7 +1991,8 @@ function Get-Ollama {
     }
     if ($ollamaProcess.Count -gt 1) {
         Write-Host "Multiple Ollama processes are running with PID(s): $($ollamaProcess.Id -join ', ')"
-    } else {
+    }
+    else {
         Write-Host "Ollama is running with PID: $($ollamaProcess.Id)"
     }
 
@@ -2103,20 +2104,31 @@ function Test-OllamaRunningModel {
     Author: Voytas75
     Date: 2024.07.10
 #>
+    param(
+        [switch]$NOInfo
+    )
     try {
         # Make a GET request to the /api/ps endpoint to retrieve running model information
         $response = Invoke-RestMethod -Uri "http://localhost:11434/api/ps" -Method Get
         
-        if ($response.models) {
-            Write-Host "Ollama is running the following model:"
-            # Iterate through each model and output its name and size
-            $response.models | ForEach-Object {
-                Write-Host "- $($_.name) (Size: $($_.size))"
-                return $_.name
+        if ($response.model) {
+            if (-not $NOInfo) {
+                Write-Host "Ollama is running the following model:"
             }
+            # Iterate through each model and output its name and size
+            $script:ollamaModel = $response.model
+            if ($script:ollamaModel) {
+                Write-Host "- $($script:ollamaModel.name) (Size: $($script:ollamaModel.size))"
+                $script:ollamamodel = $script:ollamaModel.name
+                $env:OLLAMA_MODEL = $script:ollamamodel
+                [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $script:ollamamodel, 'User')
+                return $script:ollamaModel
+            }            
         }
         else {
-            Write-Host "No models are currently running in Ollama."
+            if (-not $NOInfo) {
+                Write-Host "No models are currently running in Ollama."
+            }
             #Write-Host "To run a model in Ollama, use the following command:"
             #Write-Host "ollama run <model-name>"
             return $false
@@ -2145,7 +2157,8 @@ function Start-OllamaModel {
     Date: 2024.07.10
 #>
     # Get the path of the Ollama executable
-    $ollamaPath = (Get-Command ollama -ErrorAction SilentlyContinue).Source
+    #$ollamaPath = (Get-Command ollama -ErrorAction SilentlyContinue).Source
+    $ollamaPath = Test-OllamaInstalled
     if (-not $ollamaPath) {
         Write-Host "Ollama is not found in PATH. Make sure it's installed and in your system PATH."
         return $false
@@ -2169,8 +2182,8 @@ function Start-OllamaModel {
 
             # Check if the environment variable 'ollama_model' is set
             if ($env:ollama_model) {
-                $ModelName = $env:ollama_model
-                if ($models -notcontains $ModelName) {
+                #$ModelName = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL','user')
+                if ($models -notcontains $env:ollama_model) {
                     Write-Host "Invalid model name specified in environment variable 'ollama_model'. Please select a model from the list."
                     $ModelName = $null
                 }
@@ -2225,7 +2238,8 @@ function Test-OllamaInstalled {
         if ($ollamaPath) {
             #Write-Host "Ollama is installed at: $($ollamaPath.Source)"
             return $ollamaPath.Source
-        } else {
+        }
+        else {
             #Write-Host "Ollama is not installed or not in PATH."
             return $false
         }
@@ -2259,7 +2273,8 @@ function Test-OllamaRunning {
         $ollamaProcess = Get-Process ollama -ErrorAction SilentlyContinue
         if ($ollamaProcess) {
             return $ollamaProcess
-        } else {
+        }
+        else {
             return $false
         }
     }
@@ -2319,47 +2334,84 @@ $env:PSAOAI_BANNER = "0"
 #if ((Get-Module -ListAvailable -Name PSAOAI | Where-Object { [version]$_.version -ge [version]"0.3.2" })) {
 if (    Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
     [void](Import-module -name PSAOAI -Force)
-} else {
+}
+else {
     Write-Warning "-- You need to install/update PSAOAI module version >= 0.3.2. Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
     return
 }
 Show-Banner
 
 #region ollama
-if ($LLMProvider -eq "ollama") {
-    $runningModelOllama = Test-OllamaRunningModel
-    if ($runningModelOllama) {
-        $env:OLLAMA_MODEL = $runningModelOllama
-        $script:ollamaModel = $runningModelOllama
-    } else {
-        $script:ollamaModel = Read-Host "Please provide the LLM model for ollama"
-    }
-
-    if (-not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
-        $ollamaModelRunning = $false
-        for ($attempts = 0; $attempts -lt 10; $attempts++) {
-            $runningModelOllama = Test-OllamaRunningModel
-            if ($runningModelOllama) {
-                $ollamaModelRunning = $true
-                $env:OLLAMA_MODEL = $runningModelOllama
-                $script:ollamaModel = $runningModelOllama
-                break
-            }
-            Start-OllamaModel
-            Start-Sleep -Seconds 2
-        }
-
-        if (-not $ollamaModelRunning) {
-            Write-Warning "Ollama model is not running after multiple attempts. Waiting 15 sec...."
-            for ($i = 1; $i -le 15; $i++) {
-                Write-Progress -Activity "Waiting for Ollama model to start" -Status "$i seconds elapsed" -PercentComplete (($i / 15) * 100)
-                Start-Sleep -Seconds 1
-            }
-        }
-    }
-
-    Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value."
+function Set-OllamaModel {
+    param ($model)
+    $env:OLLAMA_MODEL = $model
+    $script:ollamaModel = $model
+    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $model, 'User')
 }
+
+function Ensure-OllamaModelRunning {
+    param ($attempts = 10, $delay = 2)
+    for ($i = 0; $i -lt $attempts; $i++) {
+        $runningModel = Test-OllamaRunningModel
+        if ($runningModel) {
+            Set-OllamaModel -model $runningModel
+            return $true
+        }
+        Start-OllamaModel
+        Start-Sleep -Seconds $delay
+    }
+    return $false
+}
+
+# Check if Ollama is installed
+$ollamaInstalled = Test-OllamaInstalled
+if (-not $ollamaInstalled) {
+    Write-Warning "Ollama is not installed. Please install Ollama and ensure it is in your PATH."
+    return
+}
+else {
+    Write-Host "Ollama is installed at: $ollamaInstalled"
+}
+
+# Check if Ollama is running
+$ollamaRunning = Test-OllamaRunning
+if (-not $ollamaRunning) {
+    Write-Warning "Ollama is not running. Attempting to start Ollama..."
+    if (Start-OllamaInNewConsole) {
+        Write-Host "Ollama started successfully."
+    }
+    else {
+        Write-Warning "Failed to start Ollama."
+        return
+    }
+}
+
+# Ensure a model is running
+$runningModelOllama = Test-OllamaRunningModel -NOInfo
+if ($runningModelOllama) {
+    Set-OllamaModel -model $runningModelOllama
+}
+else {
+    [void](Start-OllamaModel) 
+    $runningModel = Test-OllamaRunningModel -NOInfo
+    if ($runningModel) {
+        if (Ensure-OllamaModelRunning) {
+            Set-OllamaModel -model $runningModel
+        }
+    }
+}
+
+if (-not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
+    if (-not (Test-OllamaRunningModel -NOInfo)) {
+        Write-Warning "Ollama model is not running after multiple attempts. Waiting 15 sec...."
+        for ($i = 1; $i -le 15; $i++) {
+            Write-Progress -Activity "Waiting for Ollama model to start" -Status "$i seconds elapsed" -PercentComplete (($i / 15) * 100)
+            Start-Sleep -Seconds 1
+        }
+    }
+}
+
+Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value."
 #endregion ollama
 
 $scriptname = "AIPSTeam"

@@ -101,20 +101,20 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
 ### Configuration
 
 - **Parameters**:
-  - `-userInput`: Defines the project outline as a string (can also be piped).
-  - `-Stream`: Controls whether the output should be streamed live (default: `$true`).
-  - `-NOPM`: Disables the Project Manager functions.
-  - `-NODocumentator`: Disables the Documentator functions.
-  - `-NOLog`: Disables the logging functions.
-  - `-LogFolder`: Specifies the folder where logs should be stored.
-  - `-DeploymentChat`: Specifies the deployment chat environment variable for Azure OpenAI (default: retrieved from environment variable `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT` - [PSAOAI](https://github.com/voytas75/PSAOAI)).
+  - `userInput`: Defines the project outline as a string (can also be piped).
+  - `Stream`: Controls whether the output should be streamed live (default: `$true`).
+  - `NOPM`: Disables the Project Manager functions.
+  - `NODocumentator`: Disables the Documentator functions.
+  - `NOLog`: Disables the logging functions.
+  - `LogFolder`: Specifies the folder where logs should be stored.
+  - `DeploymentChat`: Specifies the deployment chat environment variable for Azure OpenAI (default: retrieved from environment variable `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT` - [PSAOAI](https://github.com/voytas75/PSAOAI)).
   - `MaxTokens`: Specifies the maximum number of tokens to generate in the response. This parameter controls the length of the generated output. The default value is set within the script, but it can be overridden by the user if needed.
-  - `-LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
-  - `-NOTips`: Disables tips.
-  - `-VerbosePrompt`: Show Prompts.
-  - `-LoadProjectStatus`: Loads the project status from a specified path. Part of the 'LoadStatus' parameter set.
-  - `-LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
-  - `-NORAG`: Disables the RAG (Retrieve and Generate) functionality.
+  - `LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
+  - `NOTips`: Disables tips.
+  - `VerbosePrompt`: Show Prompts.
+  - `LoadProjectStatus`: Loads the project status from a specified path. Part of the 'LoadStatus' parameter set.
+  - `LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
+  - `NORAG`: Disables the RAG (Retrieve and Generate) functionality.
 
 #### Environment Variables
 
@@ -136,9 +136,9 @@ To configure the script to use external providers, you need to set the following
    Example:
 
    ```powershell
-   $env:PSAOAI_API_AZURE_OPENAI_ENDPOINT="https://<your-endpoint>.openai.azure.com"
-   $env:PSAOAI_API_AZURE_OPENAI_APIVERSION="2024-05-01-preview"
-   $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT="your-deployment-name"
+   [System.Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_ENDPOINT','https://<your-endpoint>.openai.azure.com','user')
+   [System.Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_APIVERSION','2024-05-01-preview','user')
+   [System.Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT','your-deployment-name','user')
    ```
 
 > [!IMPORTANT]
@@ -154,8 +154,7 @@ To configure the script to use external providers, you need to set the following
    Example:
 
    ```powershell
-   $env:OLLAMA_MODEL="<ollama model, example: phi3:latest>"
-   
+   [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL','ollama model, example: phi3:latest','user')
    ```
 
 3. **LM Studio**:
@@ -176,8 +175,8 @@ To configure the script to use external providers, you need to set the following
    Example:
 
    ```powershell
-   $env:AZURE_BING_API_KEY="your-azure-bing-api-key"
-   $env:AZURE_BING_ENDPOINT="https://api.bing.microsoft.com/"
+   [System.Environment]::SetEnvironmentVariable('AZURE_BING_API_KEY','your-azure-bing-api-key','user')
+   [System.Environment]::SetEnvironmentVariable('AZURE_BING_ENDPOINT','https://api.bing.microsoft.com/','user')
    ```
 
 [Bing Search API documentation](https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/)
