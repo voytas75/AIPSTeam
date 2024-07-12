@@ -90,7 +90,7 @@ System.String. You can pipe a string to the 'userInput' parameter.
 The output varies depending on how each specialist processes their part of the project. Typically, text-based results are expected, which may include status messages or visual representations like graphs or color blocks related to system metrics such as RAM load, depending on the user input specification provided via the 'userInput' parameter.
 
 .EXAMPLE 
-PS> "A PowerShell project to monitor CPU usage and display dynamic graph." | .\AIPSTeam.ps1 -Stream $false
+PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
