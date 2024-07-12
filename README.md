@@ -2,9 +2,9 @@
 
 ![AIPSTeam](https://github.com/voytas75/AIPSTeam/blob/master/images/AIPSTeam.png?raw=true "aipsteam")
 
-[![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AIPSTeam)](https://www.powershellgallery.com/packages/AIPSTeam)
-
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/A0A6KYBUS)
+
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AIPSTeam)](https://www.powershellgallery.com/packages/AIPSTeam)
 
 ## Table of Contents
 
