@@ -7,7 +7,7 @@
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.1.1[unpublished]: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic.
+3.1.1: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
 3.0.3: Corrected log entry method usage
 3.0.2: check module version of PSAOAI, ollama checks, ollama auto manager.
 3.0.1: implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
@@ -130,7 +130,7 @@ param(
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the folder where logs should be stored.")]
     [string] $LogFolder,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the deployment chat environment variable for PSAOAI.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the deployment chat environment variable for PSAOAI (AZURE OpenAI).")]
     [string] $DeploymentChat = [System.Environment]::GetEnvironmentVariable("PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT", "User"),
 
     [Parameter(Mandatory = $false, ParameterSetName = 'LoadStatus', HelpMessage = "Loads the project status from a specified path.")]
@@ -178,14 +178,13 @@ class ProjectTeam {
     [double] $TopP  # TopP parameter for the response function
     [string] $Status  # Status of the team member
     [System.Collections.ArrayList] $Log  # Log of the team member's actions
-    [scriptblock] $ResponseFunction  # Function to process the input and generate a response
     [string] $LogFilePath  # Path to the log file
     [array] $FeedbackTeam  # Team of experts providing feedback
     [PSCustomObject] $GlobalState
     [string] $LLMProvider
     
     # Constructor for the ProjectTeam class
-    ProjectTeam([string] $name, [string] $role, [string] $prompt, [double] $temperature, [double] $top_p, [scriptblock] $responseFunction, [PSCustomObject] $GlobalState) {
+    ProjectTeam([string] $name, [string] $role, [string] $prompt, [double] $temperature, [double] $top_p, [PSCustomObject] $GlobalState) {
         $this.Name = $name
         $this.Role = $role
         $this.Prompt = $prompt
@@ -195,7 +194,6 @@ class ProjectTeam {
         $this.TopP = $top_p
         $this.Status = "Not Started"
         $this.Log = @()
-        $this.ResponseFunction = $responseFunction
         $this.GlobalState = $GlobalState
         $this.LogFilePath = "$($GlobalState.TeamDiscussionDataFolder)\$name.log"
         $this.FeedbackTeam = @()
@@ -207,18 +205,17 @@ class ProjectTeam {
     [PSCustomObject] DisplayInfo([int] $display = 1) {
         # Create an ordered dictionary to store the information
         $info = [ordered]@{
-            "Name"              = $this.Name
-            "Role"              = $this.Role
-            "System prompt"     = $this.Prompt
-            "Temperature"       = $this.Temperature
-            "TopP"              = $this.TopP
-            "Responses"         = $this.ResponseMemory | ForEach-Object { "[$($_.Timestamp)] $($_.Response)" }
-            "Log"               = $this.Log -join ', '
-            "Log File Path"     = $this.LogFilePath
-            "Feedback Team"     = $this.FeedbackTeam
-            "Next Expert"       = $this.NextExpert
-            "Status"            = $this.Status
-            "Response Function" = $this.ResponseFunction
+            "Name"          = $this.Name
+            "Role"          = $this.Role
+            "System prompt" = $this.Prompt
+            "Temperature"   = $this.Temperature
+            "TopP"          = $this.TopP
+            "Responses"     = $this.ResponseMemory | ForEach-Object { "[$($_.Timestamp)] $($_.Response)" }
+            "Log"           = $this.Log -join ', '
+            "Log File Path" = $this.LogFilePath
+            "Feedback Team" = $this.FeedbackTeam
+            "Next Expert"   = $this.NextExpert
+            "Status"        = $this.Status
         }
         
         # Create a custom object from the dictionary
@@ -238,7 +235,6 @@ class ProjectTeam {
             Write-Host "Feedback Team: $($infoObject.'Feedback Team')"
             Write-Host "Next Expert: $($infoObject.'Next Expert')"
             Write-Host "Status: $($infoObject.Status)"
-            Write-Host "Response Function: $($infoObject.'Response Function')"
         }
 
         # Return the custom object
@@ -257,9 +253,7 @@ class ProjectTeam {
         try {
             Write-verbose $script:MaxTokens
 
-            #Write-Host $userinput -ForegroundColor Cyan
             # Use the user-provided function to get the response
-            #$response = & $this.ResponseFunction -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens
             $loopCount = 0
             $maxLoops = 5
             do {
@@ -401,8 +395,6 @@ class ProjectTeam {
             }
             
             # Use the user-provided function to get the response
-            #$response = & $this.ResponseFunction -SystemPrompt $this.Prompt -UserPrompt $Expertinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens
-
             $loopCount = 0
             $maxLoops = 5
             do {
@@ -490,7 +482,6 @@ class ProjectTeam {
         $summary = ""
         try {
             # Use the user-provided function to get the summary
-            #$summary = & $this.ResponseFunction -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.9 -MaxTokens $script:MaxTokens
             $loopCount = 0
             $maxLoops = 5
             do {
@@ -525,7 +516,7 @@ class ProjectTeam {
             Show-Header -HeaderText "Feedback from $($FeedbackMember.Role) to $($this.Role)"
    
             # Send feedback request and collect feedback
-            $feedback = SendFeedbackRequest -TeamMember $FeedbackMember.Role -Response $response -Prompt $FeedbackMember.Prompt -Temperature $this.Temperature -TopP $this.TopP -ResponseFunction $this.ResponseFunction
+            $feedback = SendFeedbackRequest -TeamMember $FeedbackMember.Role -Response $response -Prompt $FeedbackMember.Prompt -Temperature $this.Temperature -TopP $this.TopP
         
             if ($null -ne $feedback) {
                 $FeedbackMember.ResponseMemory.Add([PSCustomObject]@{
@@ -579,7 +570,6 @@ function SendFeedbackRequest {
         [string] $Prompt, # The prompt for the feedback request
         [double] $Temperature, # The temperature parameter for the LLM model
         [double] $TopP, # The TopP parameter for the LLM model
-        [scriptblock] $ResponseFunction, # The function to generate the response
         [PSCustomObject]$GlobalState
     )
     try {
@@ -600,7 +590,7 @@ Think step by step. Make sure your answer is unbiased.
 "@
 
         # Send the feedback request to the LLM model
-        $feedback = & $ResponseFunction -SystemPrompt $SystemPrompt -UserPrompt $NewResponse -Temperature $Temperature -TopP $TopP -MaxTokens $script:MaxTokens
+        $feedback = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $SystemPrompt -UserPrompt $NewResponse -Temperature $Temperature -TopP $TopP -MaxTokens $script:MaxTokens -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
 
         # Return the feedback
         return $feedback
@@ -1816,8 +1806,16 @@ function Invoke-BingWebSearch {
     # Define the headers for the API request
     $headers = @{
         "Ocp-Apim-Subscription-Key" = $apiKey
+        "Pragma" = "no-cache"
     }
 
+    # If the query length is greater than 50 characters, truncate it to 50 characters
+    $maxqueryLength = 100
+    if ($query.Length -gt $maxqueryLength) {
+        Write-Host "Query length is greater than $maxqueryLength characters. Truncating the query."
+        $query = $query.Substring(0, $maxqueryLength)
+    }
+    
     # Define the parameters for the API request
     $params = @{
         "q"     = $query
@@ -1832,6 +1830,15 @@ function Invoke-BingWebSearch {
     [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $Endpoint, "User")
     $endpoint += "v7.0/search"
         
+    # Disable the Expect100Continue behavior to avoid delays in sending data
+    [System.Net.ServicePointManager]::Expect100Continue = $false
+    
+    # Disable the Nagle algorithm to improve performance for small data packets
+    [System.Net.ServicePointManager]::UseNagleAlgorithm = $false
+    
+    # Set the security protocol to TLS 1.2 for secure communication
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+    
     try {
         # Make the API request to Bing Search
         $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -Body $params
@@ -1914,15 +1921,24 @@ To create effective query for the Azure Bing Web Search API, summarize given tex
 2. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine your queries. Use 'site:' for domain-specific searches.
 3. Must remove from the begin and end of query quotation marks or other characters.
 "@
-        $shortenedUserInput = $RAGAgent.ProcessInput("You must summarize and craft short qury with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'. You must respond with query only.", "Assistant is a Web Search Query Manager. Assistant's task is to suggest best query. $websearchinstructions`n`n.")
+        $shortenedUserInput = ($RAGAgent.ProcessInput("You must summarize and craft short query with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'. You must respond with query only.", "Assistant is a Web Search Query Manager. Assistant's task is to suggest best query. $websearchinstructions")).trim()
 
         Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
 
+        # Check if the shortened user input is not empty
         if (-not [string]::IsNullOrEmpty($shortenedUserInput)) {
+            # Define the log file path for storing the query
+            $logFilePath = Join-Path -Path $GlobalState.TeamDiscussionDataFolder -ChildPath "azurebingqueries.log"
+            # Append the shortened user input to the log file with a date prefix in professional log style
+            $datePrefix = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            $logEntry = "$datePrefix - Query: $shortenedUserInput"
+            Add-Content -Path $logFilePath -Value $logEntry
 
+            # Perform the web search using the shortened user input
             $webResults = Invoke-BingWebSearch -query $shortenedUserInput -count $MaxCount
         }
         else {
+            # Throw an error if the query is empty
             throw "The query is empty. Unable to perform web search."
         }
 
@@ -1931,7 +1947,8 @@ To create effective query for the Azure Bing Web Search API, summarize given tex
             # Extract and clean text content from the web results
             $webResultsText = ($webResults | ForEach-Object {
                     $htmlContent = Invoke-WebRequest -Uri $_.url
-                    $textContent = ($htmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText -replace '(?m)^\s*$', ''
+                    $textContent = ($htmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
+                    # -replace '(?m)^\s*$', ''
                     $textContent
                 }
             ) -join "`n`n"
@@ -2039,7 +2056,8 @@ function Get-OllamaModels {
             Write-Host "Models:"
             # Iterate through each model and output its name and size
             $response.models | ForEach-Object {
-                Write-Host "- $($_.name) (Size: $($_.size))"
+                $sizeInGB = [math]::Round($_.size / 1GB, 2)
+                Write-Host "- $($_.name) (Size: $sizeInGB GB)"
             }
         }
         else {
@@ -2111,19 +2129,24 @@ function Test-OllamaRunningModel {
         # Make a GET request to the /api/ps endpoint to retrieve running model information
         $response = Invoke-RestMethod -Uri "http://localhost:11434/api/ps" -Method Get
         
-        if ($response.model) {
+        if ($response.models) {
             if (-not $NOInfo) {
-                Write-Host "Ollama is running the following model:"
+                Write-Host "Ollama is running the following models:"
             }
             # Iterate through each model and output its name and size
-            $script:ollamaModel = $response.model
-            if ($script:ollamaModel) {
-                Write-Host "- $($script:ollamaModel.name) (Size: $($script:ollamaModel.size))"
-                $script:ollamamodel = $script:ollamaModel.name
-                $env:OLLAMA_MODEL = $script:ollamamodel
-                [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $script:ollamamodel, 'User')
-                return $script:ollamaModel
-            }            
+            $script:ollamaModels = $response.models
+            foreach ($model in $script:ollamaModels) {
+                if (-not $NOInfo) {
+                    $sizeInGB = [math]::Round($model.size / 1GB, 2)
+                    Write-Host "$($model.name) (Size: $sizeInGB GB)"
+                }
+            }
+            # Choose and return the first model
+            $firstModel = $script:ollamaModels[0]
+            $script:ollamamodel = $firstModel.name
+            $env:OLLAMA_MODEL = $script:ollamamodel
+            [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $firstModel.Name, 'User')
+            return $firstModel.Name
         }
         else {
             if (-not $NOInfo) {
@@ -2166,10 +2189,12 @@ function Start-OllamaModel {
 
     try {
         # Check if any model is currently running
-        $runningModel = Test-OllamaRunningModel
+        $runningModel = Test-OllamaRunningModel -NOInfo
         if ($runningModel) {
             Write-Host "Model '$runningModel' is already running."
-            return $runningModel
+            [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $runningModel, 'user')
+            $script:ollamaModel = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')
+            return $script:ollamaModel
         }
 
         # Make a GET request to the /api/tags endpoint to retrieve available models
@@ -2181,14 +2206,16 @@ function Start-OllamaModel {
             #$models | ForEach-Object { Write-Host "- $_" }
 
             # Check if the environment variable 'ollama_model' is set
-            if ($env:ollama_model) {
+            if ([System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')) {
                 #$ModelName = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL','user')
-                if ($models -notcontains $env:ollama_model) {
+                if ($models -notcontains [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')) {
                     Write-Host "Invalid model name specified in environment variable 'ollama_model'. Please select a model from the list."
-                    $ModelName = $null
+                    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', '', 'user')
+                    $ModelName = [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', '', 'user')
                 }
             }
-
+            $script:ollamaModel = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')
+            $ModelName = $script:ollamaModel
             # If 'ollama_model' is not set or invalid, prompt the user to select a model
             if (-not $ModelName) {
                 Get-OllamaModels
@@ -2203,7 +2230,10 @@ function Start-OllamaModel {
 
             # Start the selected model using a new PowerShell process
             #Start-Process powershell -ArgumentList "-NoExit", "-Command", "& '$ollamaPath' run $ModelName"
+            Write-Host "Starting with $ModelName"
             Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "$ollamaPath run $ModelName" -WindowStyle Minimized
+            [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $ModelName, 'user')
+            $script:ollamaModel = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')
             return $ModelName
         }
         else {
@@ -2284,7 +2314,26 @@ function Test-OllamaRunning {
     }
 }
 
+function Set-OllamaModel {
+    param ($model)
+    $env:OLLAMA_MODEL = $model
+    $script:ollamaModel = $model
+    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $model, 'User')
+}
 
+function Ensure-OllamaModelRunning {
+    param ($attempts = 10, $delay = 2)
+    for ($i = 0; $i -lt $attempts; $i++) {
+        $runningModel = Test-OllamaRunningModel
+        if ($runningModel) {
+            Set-OllamaModel -model $runningModel
+            return $true
+        }
+        Start-OllamaModel
+        Start-Sleep -Seconds $delay
+    }
+    return $false
+}
 #endregion Functions
 
 #region Setting Up
@@ -2342,66 +2391,51 @@ else {
 Show-Banner
 
 #region ollama
-function Set-OllamaModel {
-    param ($model)
-    $env:OLLAMA_MODEL = $model
-    $script:ollamaModel = $model
-    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $model, 'User')
-}
-
-function Ensure-OllamaModelRunning {
-    param ($attempts = 10, $delay = 2)
-    for ($i = 0; $i -lt $attempts; $i++) {
-        $runningModel = Test-OllamaRunningModel
-        if ($runningModel) {
-            Set-OllamaModel -model $runningModel
-            return $true
-        }
-        Start-OllamaModel
-        Start-Sleep -Seconds $delay
-    }
-    return $false
-}
-
-# Check if Ollama is installed
-$ollamaInstalled = Test-OllamaInstalled
-if (-not $ollamaInstalled) {
-    Write-Warning "Ollama is not installed. Please install Ollama and ensure it is in your PATH."
-    return
-}
-else {
-    Write-Host "Ollama is installed at: $ollamaInstalled"
-}
-
-# Check if Ollama is running
-$ollamaRunning = Test-OllamaRunning
-if (-not $ollamaRunning) {
-    Write-Warning "Ollama is not running. Attempting to start Ollama..."
-    if (Start-OllamaInNewConsole) {
-        Write-Host "Ollama started successfully."
-    }
-    else {
-        Write-Warning "Failed to start Ollama."
+if ($LLMProvider -eq 'ollama') {
+    # Check if Ollama is installed
+    $ollamaInstalled = Test-OllamaInstalled
+    if (-not $ollamaInstalled) {
+        Write-Warning "Ollama is not installed. Please install Ollama and ensure it is in your PATH."
         return
     }
-}
+    else {
+        Write-Host "Ollama is installed at: $ollamaInstalled"
+    }
 
-# Ensure a model is running
-$runningModelOllama = Test-OllamaRunningModel -NOInfo
-if ($runningModelOllama) {
-    Set-OllamaModel -model $runningModelOllama
-}
-else {
-    [void](Start-OllamaModel) 
-    $runningModel = Test-OllamaRunningModel -NOInfo
-    if ($runningModel) {
-        if (Ensure-OllamaModelRunning) {
-            Set-OllamaModel -model $runningModel
+    # Check if Ollama is running
+    $ollamaRunning = Test-OllamaRunning
+    if (-not $ollamaRunning) {
+        Write-Warning "Ollama is not running. Attempting to start Ollama..."
+        if (Start-OllamaInNewConsole) {
+            Write-Host "Ollama started successfully."
+        }
+        else {
+            Write-Warning "Failed to start Ollama."
+            return
         }
     }
-}
+    else {
+        Write-Host "Ollama is running."
+    }
 
-if (-not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
+    # Ensure a model is running
+    $runningModelOllama = Test-OllamaRunningModel
+    if ($runningModelOllama) {
+        Set-OllamaModel -model $runningModelOllama
+    }
+    else {
+        if (Start-OllamaModel) {
+            $runningModel = Test-OllamaRunningModel -NOInfo
+            if ($runningModel) {
+                if (Ensure-OllamaModelRunning) {
+                    Set-OllamaModel -model $runningModel
+                }
+            }
+        }
+    }
+
+    <#
+if ([System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'User')) {
     if (-not (Test-OllamaRunningModel -NOInfo)) {
         Write-Warning "Ollama model is not running after multiple attempts. Waiting 15 sec...."
         for ($i = 1; $i -le 15; $i++) {
@@ -2410,8 +2444,10 @@ if (-not [string]::IsNullOrEmpty($env:OLLAMA_MODEL)) {
         }
     }
 }
+#>
 
-Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value."
+    Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value."
+}
 #endregion ollama
 
 $scriptname = "AIPSTeam"
@@ -2511,11 +2547,6 @@ Additional information: PowerShell is a task automation and configuration manage
 "@ -f $requirementsAnalystRole,
     0.6,
     0.9,
-    [scriptblock]::Create({
-            param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-            return $response
-        }),
     $GlobalState
 )
 
@@ -2544,11 +2575,6 @@ You act as {0}. Your task is provide specialized insights and recommendations ba
 "@ -f $domainExpertRole,
     0.65,
     0.9,
-    [scriptblock]::Create({
-            param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream
-            return $response
-        }),
     $GlobalState
 )
 
@@ -2572,11 +2598,6 @@ Design includes:
 "@ -f $systemArchitectRole,
     0.7,
     0.85,
-    [scriptblock]::Create({
-            param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-            return $response
-        }),
     $GlobalState
 )
 
@@ -2619,11 +2640,6 @@ Instructions:
 "@ -f $powerShellDeveloperRole,
     0.65,
     0.8,
-    [scriptblock]::Create({
-            param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-            return $response
-        }),
     $GlobalState
 )
 
@@ -2645,11 +2661,6 @@ Background Information: PowerShell scripts can perform a wide range of tasks, so
 "@ -f $qaEngineerRole,
     0.6,
     0.9,
-    [scriptblock]::Create({
-            param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-            return $response
-        }),
     $GlobalState
 )
 
@@ -2674,11 +2685,6 @@ You act as {0}. You are tasked with creating comprehensive documentation for the
 "@ -f $documentationSpecialistRole,
     0.6,
     0.8,
-    [scriptblock]::Create({
-            param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-            return $response
-        }),
     $GlobalState
 )
 
@@ -2699,11 +2705,6 @@ You act as {0}. Your task is to provide a comprehensive summary of the PowerShel
 "@ -f $projectManagerRole,
     0.7,
     0.85,
-    [scriptblock]::Create({
-            param ($SystemPrompt, $UserPrompt, $Temperature, $TopP)
-            $response = Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -Deployment $DeploymentChat -simpleresponse -OneTimeUserPrompt -Stream $GlobalState.Stream -LogFolder $GlobalState.TeamDiscussionDataFolder
-            return $response
-        }),
     $GlobalState
 )
 #endregion ProjectTeam
@@ -2853,7 +2854,8 @@ $examplePScode
     #region Doc
     if (-not $GlobalState.NODocumentator) {
         if (-not $GlobalState.NOLog) {
-            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode) | Out-File -FilePath $DocumentationFullName
+            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode) 
+            $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
         }
         else {
             $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode)
@@ -2866,7 +2868,10 @@ $examplePScode
     if (-not $GlobalState.NOPM) {
         # Example of summarizing all steps,  Log final response to file
         if (-not $GlobalState.NOLog) {
-            $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ") | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
+            $projectManagerPrompt = "Generate project report without the PowerShell code.`n"
+            $projectManagerPrompt += $GlobalState.GlobalResponse -join ", "
+            $projectManagerResponse = $projectManager.ProcessInput($projectManagerPrompt) 
+            $projectManagerResponse | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
         }
         else {
             $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ")
