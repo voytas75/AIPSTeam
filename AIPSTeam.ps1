@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.1.1
+.VERSION 3.1.2
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt
@@ -7,6 +7,7 @@
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
+3.1.2[unpublished]:
 3.1.1: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
 3.0.3: Corrected log entry method usage
 3.0.2: check module version of PSAOAI, ollama checks, ollama auto manager.
