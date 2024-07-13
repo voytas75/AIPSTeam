@@ -2479,7 +2479,7 @@ if ($LLMProvider -eq 'ollama') {
         return
     }
     else {
-        Write-Host "Ollama is installed at: $ollamaInstalled"
+        Write-Host "++ Ollama is installed at: $ollamaInstalled"
     }
 
     # Check if Ollama is running
