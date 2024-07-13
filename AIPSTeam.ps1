@@ -1660,7 +1660,7 @@ function Invoke-AIPSTeamOllamaCompletion {
         stream  = $stream
     } | ConvertTo-Json
     Write-Host "++ Ollama ($($script:ollamamodel)) is working..."
-    $response = Invoke-WebRequest -Method POST -Body $ollamajson -uri "http://localhost:11434/api/generate"
+    $response = Invoke-WebRequest -Method POST -Body $ollamajson -uri "$($script:ollamaEndpoint)api/generate"
     # Log the prompt and response to the log file
     $logEntry = @{
         Timestamp    = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
@@ -1807,7 +1807,7 @@ function Invoke-BingWebSearch {
     # Define the headers for the API request
     $headers = @{
         "Ocp-Apim-Subscription-Key" = $apiKey
-        "Pragma" = "no-cache"
+        "Pragma"                    = "no-cache"
     }
 
     # If the query length is greater than 50 characters, truncate it to 50 characters
@@ -2052,7 +2052,7 @@ function Get-OllamaModels {
     #>
     try {
         # Make a GET request to the /api/tags endpoint to retrieve model information
-        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -Method Get
+        $response = Invoke-RestMethod -Uri "$($script:ollamaEndpoint)api/tags" -Method Get
         if ($response.models) {
             Write-Host "Models:"
             # Iterate through each model and output its name and size
@@ -2128,7 +2128,7 @@ function Test-OllamaRunningModel {
     )
     try {
         # Make a GET request to the /api/ps endpoint to retrieve running model information
-        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/ps" -Method Get
+        $response = Invoke-RestMethod -Uri "$($script:ollamaEndpoint)api/ps" -Method Get
         
         if ($response.models) {
             if (-not $NOInfo) {
@@ -2199,7 +2199,7 @@ function Start-OllamaModel {
         }
 
         # Make a GET request to the /api/tags endpoint to retrieve available models
-        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -Method Get
+        $response = Invoke-RestMethod -Uri "$($script:ollamaEndpoint)api/tags" -Method Get
         if ($response.models) {
             #Write-Host "Available Models:"
             # List available models
@@ -2393,6 +2393,23 @@ Show-Banner
 
 #region ollama
 if ($LLMProvider -eq 'ollama') {
+    [uri]$script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
+    if ([string]::IsNullOrEmpty($script:ollamaEndpoint)) {
+        $defaultEndpoint = 'http://localhost:11434/'
+        try {
+            [uri]$script:ollamaEndpoint = $defaultEndpoint
+            $env:OLLAMA_ENDPOINT = $defaultEndpoint
+            [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', $defaultEndpoint, 'user')
+            if ([System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')) {
+                Write-Host "Environment variable 'OLLAMA_ENDPOINT' was set successfully ('$defaultEndpoint'). Set it manually if you need a non-default value: [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', '<your-ollama-api-endpoint>', 'user')" -ForegroundColor Green
+            }
+        }
+        # If setting the variable failed, display an error message
+        catch {
+            Write-Warning "Failed to set environment variable 'OLLAMA_ENDPOINT'."
+        } 
+    }
+
     # Check if Ollama is installed
     $ollamaInstalled = Test-OllamaInstalled
     if (-not $ollamaInstalled) {
