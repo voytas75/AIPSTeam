@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.3.2
+.VERSION 3.4.2
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -7,7 +7,8 @@
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.3.2[unpublished]: add streaming http response to ollama.
+3.4.2[unpublished]: 
+3.3.2: minor changes and fixes, add streaming http response to ollama.
 3.2.1: minor changes and fixes, issue #2 - add env for ollama endpoint
 3.1.1: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
 3.0.3: Corrected log entry method usage
@@ -96,7 +97,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.3.2
+Version: 3.4.2
 Author: voytas75
 Creation Date: 05.2024
 
@@ -145,7 +146,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.3.2"
+$AIPSTeamVersion = "3.4.2"
 
 #region ProjectTeamClass
 <#
@@ -2194,16 +2195,19 @@ function Test-OllamaRunningModel {
         
         if ($response.models) {
             if (-not $NOInfo) {
-                Write-Host "++ Ollama is running the following models:"
+                Write-Host "++ Ollama is running the following models: " -NoNewline
             }
             # Iterate through each model and output its name and size
             $script:ollamaModels = $response.models
+            $ollamaRunningModels = @()
             foreach ($model in $script:ollamaModels) {
                 if (-not $NOInfo) {
                     $sizeInGB = [math]::Round($model.size / 1GB, 2)
-                    Write-Host "$($model.name) (Size: $sizeInGB GB)"
+                    $ollamaRunningModels += "$($model.name) (Size: $sizeInGB GB)"
                 }
             }
+            Write-Host $($ollamaRunningModels -join ',')
+
             # Choose and return the first model
             $firstModel = $script:ollamaModels[0]
             $script:ollamamodel = $firstModel.name
@@ -2485,18 +2489,18 @@ if ($LLMProvider -eq 'ollama') {
     # Check if Ollama is running
     $ollamaRunning = Test-OllamaRunning
     if (-not $ollamaRunning) {
-        Write-Warning "-- Ollama is not running. Attempting to start Ollama..."
+        Write-Host "-- Ollama is not running. Attempting to start Ollama..." -ForegroundColor Yellow
         if (Start-OllamaInNewConsole) {
             Write-Host "++ Ollama started successfully."
         }
         else {
-            Write-Warning "-- Failed to start Ollama."
+            Write-Warning "Failed to start Ollama."
             return
         }
     }
-    else {
-        Write-Host "++ Ollama is running."
-    }
+    #else {
+    #    Write-Host "++ Ollama is running."
+    #}
 
     # Ensure a model is running
     $runningModelOllama = Test-OllamaRunningModel
@@ -2513,19 +2517,6 @@ if ($LLMProvider -eq 'ollama') {
             }
         }
     }
-
-    <#
-if ([System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'User')) {
-    if (-not (Test-OllamaRunningModel -NOInfo)) {
-        Write-Warning "Ollama model is not running after multiple attempts. Waiting 15 sec...."
-        for ($i = 1; $i -le 15; $i++) {
-            Write-Progress -Activity "Waiting for Ollama model to start" -Status "$i seconds elapsed" -PercentComplete (($i / 15) * 100)
-            Start-Sleep -Seconds 1
-        }
-    }
-}
-#>
-
     Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
 }
 #endregion ollama
