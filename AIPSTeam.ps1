@@ -1692,7 +1692,7 @@ function Invoke-AIPSTeamOllamaCompletion {
     
         # Initialize variable to accumulate the response text
         $completeText = ""
-        Write-Host "Streaming" -ForegroundColor Blue
+        Write-Host "++ Streaming" -ForegroundColor Blue
 
         # Read and process each line of the response stream
         while ($null -ne ($line = $reader.ReadLine()) -or (-not $reader.EndOfStream)) {
