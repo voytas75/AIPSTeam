@@ -228,7 +228,7 @@ Ensure these environment variables are set before running the script to enable t
 5. **Generate System Report**:
 
    ```powershell
-   "Script for reporting CPU, RAM, and disk usage." | AIPSTeam.ps1 -LogFolder "C:\SystemReports"
+   "Script for reporting CPU, RAM, and disk usage." | AIPSTeam -LogFolder "C:\SystemReports"
    ```
 
    **Description**: This example generates a comprehensive system report that includes details about CPU, RAM, and disk usage. The report is saved in the specified log folder `C:\SystemReports`.
@@ -252,7 +252,7 @@ Ensure these environment variables are set before running the script to enable t
 8. **Backup Important Files**:
 
    ```powershell
-   "Backup important files from Documents to an external drive." | AIPSTeam.ps1 -NOLog
+   "Backup important files from Documents to an external drive." | AIPSTeam -NOLog
    ```
 
    **Description**: This example backs up important files from the Documents folder to an external drive. The `-NOLog` parameter disables the logging functions.
@@ -260,7 +260,7 @@ Ensure these environment variables are set before running the script to enable t
 9. **Monitor GPU Usage**:
 
    ```powershell
-   "Monitor GPU usage and display a bar chart of GPU load." | AIPSTeam.ps1 -Stream $true
+   "Monitor GPU usage and display a bar chart of GPU load." | AIPSTeam -Stream $true
    ```
 
    **Description**: This example monitors the GPU usage and displays a bar chart showing the GPU load. The `-Stream $true` parameter enables live streaming of the output.
@@ -292,7 +292,7 @@ Ensure these environment variables are set before running the script to enable t
 13. **Check Disk Health**:
 
       ```powershell
-      "Check disk health and display a summary of SMART attributes." | AIPSTeam.ps1 -NOPM -NODocumentator
+      "Check disk health and display a summary of SMART attributes." | AIPSTeam -NOPM -NODocumentator
       ```
 
       **Description**: This example checks the disk health and displays a summary of SMART attributes. The `-NOPM` parameter disables the Project Manager functions, and the `-NODocumentator` parameter disables the Documentator functions.
@@ -300,7 +300,7 @@ Ensure these environment variables are set before running the script to enable t
 14. **Generate Text Summary Using LLM Provider**:
 
       ```powershell
-      "Recent software activities on Windows 11." | AIPSTeam.ps1 -LLMProvider "ollama" -Stream $false
+      "Recent software activities on Windows 11." | AIPSTeam -LLMProvider "ollama" -Stream $false
       ```
 
       **Description**: This example generates a text summary of recent project activities using the specified LLM provider, in this case, "ollama". The `-Stream $false` parameter disables live streaming of the output.
