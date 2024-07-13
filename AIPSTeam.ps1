@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.2.2
+.VERSION 3.3.2
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -7,7 +7,7 @@
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.2.2[unpublished]:
+3.3.2[unpublished]: add streaming http response to ollama.
 3.2.1: minor changes and fixes, issue #2 - add env for ollama endpoint
 3.1.1: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
 3.0.3: Corrected log entry method usage
@@ -96,7 +96,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.2.2
+Version: 3.3.2
 Author: voytas75
 Creation Date: 05.2024
 
@@ -145,7 +145,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.2.2"
+$AIPSTeamVersion = "3.3.2"
 
 #region ProjectTeamClass
 <#
@@ -1541,50 +1541,48 @@ function Invoke-LLMChatCompletion {
     )
 
     try {
-        # Display prompts if VerbosePrompt is enabled
+        # Check if verbose prompts are enabled and display them
         if ($GlobalState.VerbosePrompt) {
             Write-Host $SystemPrompt -ForegroundColor DarkMagenta
             Write-Host $UserPrompt -ForegroundColor DarkMagenta
         }
 
-        # Handle different LLM providers
+        # Switch between different LLM providers based on the provider parameter
         switch ($Provider) {
             "ollama" {
-                if ($Stream) {
-                    Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
-                    $script:stream = $false
-                    $stream = $false
-                    $script:GlobalState.Stream = $false
-                }
+                # Invoke the Ollama model completion function
                 $response = Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
-                #Write-Host $response -ForegroundColor White
                 return $response
             }
             "LMStudio" {
+                # Handle streaming for LMStudio provider
                 if ($Stream) {
                     Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
                     $script:stream = $false
                     $stream = $false
                     $script:GlobalState.Stream = $false
                 }
+                # Invoke the LMStudio chat completion function
                 $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey "lm-studio" -endpoint "http://localhost:1234/v1/chat/completions"
                 return $response
             }
             "OpenAI" {
+                # Throw an exception for unsupported LLM provider
                 throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
             }
             "AzureOpenAI" {
+                # Invoke the Azure OpenAI chat completion function
                 $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
-                
                 return $response
             }
             default {
+                # Throw an exception for unknown LLM provider
                 throw "!! Unknown LLM provider: $Provider"
             }
         }
     }
     catch {
-        # Log the error and rethrow it
+        # Log the error and rethrow it with additional context
         $functionName = $MyInvocation.MyCommand.Name
         $errorMessage = "Error in ${functionName}: $_"
         Write-Error $errorMessage
@@ -1648,42 +1646,105 @@ function Invoke-AIPSTeamOllamaCompletion {
         [bool]$Stream
     )
 
-    $ollamaOptiona = [pscustomobject]@{
+    # Define options for the Ollama API call
+    $ollamaOptions = [pscustomobject]@{
         temperature = $Temperature
         top_p       = $TopP
     }
 
-    # Call Ollama
-    $ollamajson = [pscustomobject]@{
+    # Construct the JSON payload for the Ollama API request
+    $ollamaJson = [pscustomobject]@{
         model   = $ollamaModel
-        prompt  = $systemprompt + "`n" + $Userprompt
-        options = $ollamaOptiona
-        stream  = $stream
+        prompt  = $SystemPrompt + "`n" + $UserPrompt
+        options = $ollamaOptions
+        stream  = $Stream
     } | ConvertTo-Json
-    Write-Host "++ Ollama ($($script:ollamamodel)) is working..."
-    $response = Invoke-WebRequest -Method POST -Body $ollamajson -uri "$($script:ollamaEndpoint)api/generate"
-    # Log the prompt and response to the log file
+
+    # Define the URL for the Ollama API endpoint
+    $url = "$($script:ollamaEndpoint)api/generate"
+
+    # Notify the user that the Ollama model is processing
+    Write-Host "++ Ollama ($ollamaModel) is working..."
+
+    # Check if streaming is enabled and handle accordingly
+    if ($Stream) {
+        # Initialize HttpClientHandler with specific configurations for streaming
+        $httpClientHandler = [System.Net.Http.HttpClientHandler]::new()
+        $httpClientHandler.AllowAutoRedirect = $false
+        $httpClientHandler.UseCookies = $false
+        $httpClientHandler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
+        
+        # Create HttpClient using the handler
+        $httpClient = [System.Net.Http.HttpClient]::new($httpClientHandler)
+        
+        # Prepare the content of the HTTP request
+        $content = [System.Net.Http.StringContent]::new($ollamaJson, [System.Text.Encoding]::UTF8, "application/json")
+     
+        # Create and configure the HTTP request message
+        $request = New-Object System.Net.Http.HttpRequestMessage ([System.Net.Http.HttpMethod]::Post, $url)
+        $request.Content = $content
+     
+        # Send the HTTP request and read the headers of the response
+        $response = $httpClient.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+    
+        # Stream the response using StreamReader
+        $reader = [System.IO.StreamReader]::new($response.Content.ReadAsStreamAsync().Result)
+    
+        # Initialize variable to accumulate the response text
+        $completeText = ""
+        Write-Host "Streaming" -ForegroundColor Blue
+
+        # Read and process each line of the response stream
+        while ($null -ne ($line = $reader.ReadLine()) -or (-not $reader.EndOfStream)) {
+            try {
+                $line = ($line | ConvertFrom-Json)
+            }
+            catch {
+                Write-Error "Error parsing JSON: $_"
+            }            
+            if (-not $line.done) {
+                $delta = $line.response
+                $completeText += $delta
+                Write-Host $delta -NoNewline -ForegroundColor White
+            }
+        }
+        Write-Host ""
+        $completeText += "`n"
+    
+        # Output the complete streamed text
+        if ($VerbosePreference -eq "Continue") {
+            Write-Host "++ Streaming completed. Full text: $completeText" -ForegroundColor DarkBlue
+        }
+        else {
+            Write-Host "++ Streaming completed." -ForegroundColor Blue
+        }
+
+        # Clean up resources
+        $reader.Close()
+        $httpClient.Dispose()
+
+        $response = $completeText
+    }
+    else {
+        # Send a non-streaming HTTP POST request and parse the response
+        $response = Invoke-WebRequest -Method POST -Body $ollamaJson -Uri $url -UseBasicParsing
+        $response = $response.Content | ConvertFrom-Json | Select-Object -ExpandProperty response
+    }
+
+    # Log the interaction details
     $logEntry = @{
         Timestamp    = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
         SystemPrompt = $SystemPrompt
         UserPrompt   = $UserPrompt
-        Response     = ($response).Content
+        Response     = $response
     } | ConvertTo-Json
-    
+
     [void]($this.Log.Add($logEntry))
-    # Log the summary
     $this.AddLogEntry("SystemPrompt:`n$SystemPrompt")
     $this.AddLogEntry("UserPrompt:`n$UserPrompt")
-    $this.AddLogEntry("Response:`n$Response")
-    #Write-Host $response -ForegroundColor White
-    #Write-Host (($response).Content | convertfrom-json).response -ForegroundColor red
-    #throw
-    #return ($response).Content | convertfrom-json | Select-Object -ExpandProperty response
-    #write-Host "x"
-    $response = $($(($response).Content | convertfrom-json).response).trim()
-    #write-host (($response | gm) | out-string)
-    $response = $response.Trim('"')
-    return $response
+    $this.AddLogEntry("Response:`n$response")
+
+    return $response.Trim('"')
 }
 
 function Invoke-AIPSTeamLMStudioChatCompletion {
