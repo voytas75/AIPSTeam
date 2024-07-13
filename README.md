@@ -146,9 +146,15 @@ To configure the script to use external providers, you need to set the following
 > [!IMPORTANT]
 > The `PSAOAI_API_AZURE_OPENAI_KEY` environment variable cannot be provided manually because the PSAOAI module encrypts it for security purposes. Ensure that the key is set and managed through the PSAOAI module's secure mechanisms.
 
-
 2. **Ollama**:
+   - `OLLAMA_ENDPOINT`: Ollama API Endpoint.
    - `OLLAMA_MODEL`: Ollama model.
+
+The `OLLAMA_ENDPOINT` environment variable is set to a default value of `http://localhost:11434/` by the script. If you need to use a different endpoint, you must manually change the value of this environment variable. You can do this by using the following command:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT','your-ollama-api-endpoint-uri','user')
+```
 
 > [!IMPORTANT]
 > For the **Ollama** provider, you do not need to manually define the `OLLAMA_MODEL` environment variable. The script will automatically check the status of Ollama and interactively prompt you to start and choose the model to use if it is not already running. This ensures a seamless setup process and reduces the need for manual.
@@ -159,7 +165,7 @@ To configure the script to use external providers, you need to set the following
    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL','ollama model, example: phi3:latest','user')
    ```
 
-3. **LM Studio**:
+1. **LM Studio**:
    - `LMSTUDIO_API_KEY`: Your LM Studio API key.
    - `LMSTUDIO_MODEL`: The LLM model to use with LM Studio.
 
@@ -170,7 +176,7 @@ To configure the script to use external providers, you need to set the following
    $env:LMSTUDIO_MODEL="your-lmstudio-model"
    ```
 
-4. **RAG Configuration**:
+2. **RAG Configuration**:
    - `AZURE_BING_API_KEY`: Your Azure Bing Web Search API key.
    - `AZURE_BING_ENDPOINT`: Your Azure Bing Web Search endpoint. ()
 
