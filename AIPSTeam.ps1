@@ -1665,6 +1665,11 @@ function Invoke-AIPSTeamOllamaCompletion {
         stream  = $Stream
     } | ConvertTo-Json
 
+    # Ensure the Ollama endpoint ends with a '/'
+    if (-not $script:ollamaEndpoint.EndsWith('/')) {
+        $script:ollamaEndpoint += '/'
+    }
+    
     # Define the URL for the Ollama API endpoint
     $url = "$($script:ollamaEndpoint)api/generate"
 
