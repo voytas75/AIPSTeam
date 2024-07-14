@@ -4,25 +4,77 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [unreleased]
+## [3.4.2] - 2024.07.14
 
-### Added
+- minor changes and bug fixes, fix userInput value from pipeline (issue #4), add lm studio support (issue #5).
 
-### Fix
+## [3.3.2] - 2024.07.13
 
-### Changed
+- minor changes and fixes, add streaming http response to ollama.
 
-## [0.3.2] - 2024.07.10
+## [3.2.1]
 
-### Added
+- minor changes and fixes, issue #2 - add env for ollama endpoint
 
-### Fix
+## [3.1.1]
 
-- Environment Variables
+- moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
 
-### Changed
+## [3.0.3]
 
-- Project site url
+- Corrected log entry method usage
+
+## [3.0.2]
+
+- check module version of PSAOAI, ollama checks, ollama auto manager.
+
+## [3.0.1]
+
+- implement RAG based on Bing Web search API, add new method to class, extend globalstate for all params.
+
+## [2.1.2]
+
+- minor fixes.
+
+## [2.1.1]
+
+- move to new repository, new projecturi, LoadProjectStatus searching for xml file if no fullName path, fix Documentation bug.
+
+## [2.0.1]
+
+- add abstract layer for LLM providers, fix update of lastPSDevCode, ann NOTips, Updated error handling, Added VerbosePrompt switch.
+
+## [1.6.2]
+
+- fix double feedback display. 
+
+## [1.6.1]
+
+- fix stream in feedback. 
+
+## [1.6.0]
+
+- minor fixes, enhanced error reporting, added error handling, new menu options, and refactored functions.
+
+## [1.5.0]
+
+- minor fixes, modularize PSScriptAnalyzer logic, load, save project status, State Management Object, refactoring.
+
+## [1.4.0]
+
+- modularize feedback.
+
+## [1.3.0]
+
+- add to menu Generate documentation, The code research, Requirement for PSAOAI version >= 0.2.1 , fix CyclomaticComplexity.
+
+## [1.2.1]
+
+- fix EXTERNALMODULEDEPENDENCIES
+
+## [1.2.0]
+
+- add user interaction and use PSScriptAnalyzer.
 
 ## [1.1.0]
 
