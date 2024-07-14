@@ -165,18 +165,18 @@ The `OLLAMA_ENDPOINT` environment variable is set to a default value of `http://
    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL','ollama model, example: phi3:latest','user')
    ```
 
-1. **LM Studio**:
-   - `LMSTUDIO_API_KEY`: Your LM Studio API key.
-   - `LMSTUDIO_MODEL`: The LLM model to use with LM Studio.
+3. **LM Studio**:
+   - `OPENAI_API_KEY`: Your LM Studio API key, default is 'lm-studio'.
+   - `OPENAI_API_BASE `: The LLM model to use with LM Studio, default is 'http://localhost:1234/v1'.
 
    Example:
 
    ```powershell
-   $env:LMSTUDIO_API_KEY="your-lmstudio-api-key"
-   $env:LMSTUDIO_MODEL="your-lmstudio-model"
+   [System.Environment]::SetEnvironmentVariable('OPENAI_API_KEY','lm-studio','user')
+   [System.Environment]::SetEnvironmentVariable('OPENAI_API_BASE','http://localhost:1234/v1','user')
    ```
 
-2. **RAG Configuration**:
+4. **RAG Configuration**:
    - `AZURE_BING_API_KEY`: Your Azure Bing Web Search API key.
    - `AZURE_BING_ENDPOINT`: Your Azure Bing Web Search endpoint. ()
 
