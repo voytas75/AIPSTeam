@@ -7,7 +7,7 @@
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.4.2[unpublished]: minor changes and bug fixes, fix userInput value from pipeline (issue #4), add lm studio support (issue #5).
+3.4.2: minor changes and bug fixes, fix userInput value from pipeline (issue #4), add lm studio support (issue #5).
 3.3.2: minor changes and fixes, add streaming http response to ollama.
 3.2.1: minor changes and fixes, issue #2 - add env for ollama endpoint
 3.1.1: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
@@ -27,12 +27,13 @@
 1.2.0: add user interaction and use PSScriptAnalyzer.
 1.1.0: default value for DeploymentChat.
 1.0.7: Added 'DeploymentChat' parameter.
-1.0.6: Updated function calls to Add-ToGlobalResponses $GlobalState .
+1.0.6: Updated function calls to Add-ToGlobalResponses $GlobalState.
 1.0.5: code export fix.
 1.0.4: code export fix.
 1.0.3: requirements.
 1.0.2: publishing, check version fix, dependience.
 1.0.1: initializing.
+Full release notes: 
 #>
 
 #Requires -Modules PSAOAI
