@@ -7,7 +7,7 @@
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.4.2[unpublished]: minor changes and bug fixes, fix userInput value from pipeline (issue #4).
+3.4.2[unpublished]: minor changes and bug fixes, fix userInput value from pipeline (issue #4), add lm studio support (issue #5).
 3.3.2: minor changes and fixes, add streaming http response to ollama.
 3.2.1: minor changes and fixes, issue #2 - add env for ollama endpoint
 3.1.1: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
@@ -272,7 +272,7 @@ class ProjectTeam {
 
             if (-not $script:GlobalState.Stream) {
                 #write-host ($response | convertto-json -Depth 100)
-                Write-Host $response
+                Write-Host $response -ForegroundColor White
             }
             # Log the response
             $this.AddLogEntry("Generated response:`n$response")
@@ -341,7 +341,7 @@ class ProjectTeam {
             } while ($loopCount -lt $maxLoops)
 
             if (-not $script:GlobalState.Stream) {
-                Write-Host $response
+                Write-Host $response -ForegroundColor White
             }
             
             # Log the response
@@ -414,7 +414,7 @@ class ProjectTeam {
             } while ($loopCount -lt $maxLoops)
 
             if (-not $script:GlobalState.Stream) {
-                write-Host $response
+                write-Host $response -ForegroundColor White
             }
         
             # Log the response
@@ -612,16 +612,23 @@ function Get-LastMemoryFromFeedbackTeamMembers {
     param (
         [array] $FeedbackTeam
     )
+    # Initialize an empty array to store the last memories
     $lastMemories = @()
     try {
+        # Iterate over each team member in the feedback team
         foreach ($FeedbackTeamMember in $FeedbackTeam) {
+            # Get the last memory response from the team member
             $lastMemory = $FeedbackTeamMember.GetLastMemory().Response
+            # Add the last memory to the array
             $lastMemories += $lastMemory
         }
+        # Join the last memories with a newline and return the result
         return ($lastMemories -join "`n")
     }
     catch {
+        # Get the name of the current function
         $functionName = $MyInvocation.MyCommand.Name
+        # Update error handling with the error record and context
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
     }
 }
@@ -630,10 +637,12 @@ function Add-ToGlobalResponses {
     param (
         [Parameter()]
         [PSCustomObject] 
-        $GlobalState,
+        $GlobalState, # The global state object to update
     
-        $response
+        $response  # The response to add to the global responses
     )
+    
+    # Append the response to the GlobalResponse property of the GlobalState object
     $GlobalState.GlobalResponse += $response
 }
 
@@ -641,30 +650,35 @@ function Add-ToGlobalPSDevResponses {
     param (
         [Parameter()]
         [PSCustomObject] 
-        $GlobalState,
+        $GlobalState, # The global state object to update
     
-        $response
+        $response  # The response to add to the global PSDev responses
     )
+    
+    # Append the response to the GlobalPSDevResponse property of the GlobalState object
     $GlobalState.GlobalPSDevResponse += $response
 }
 
 function New-FolderAtPath {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Path,
+        [string]$Path, # The path where the new folder will be created
         [Parameter(Mandatory = $false)]
-        [string]$FolderName
+        [string]$FolderName  # The name of the new folder to be created
     )
 
     try {
+        # Output verbose messages for debugging
         Write-Verbose "New-FolderAtPath: $Path"
         Write-Verbose "New-FolderAtPath: $FolderName"
 
         # Combine the Folder path with the folder name to get the full path
         $CompleteFolderPath = Join-Path -Path $Path -ChildPath $FolderName.trim()
 
+        # Output the complete folder path and its type for debugging
         Write-Verbose "New-FolderAtPath: $CompleteFolderPath"
         Write-Verbose $CompleteFolderPath.gettype()
+
         # Check if the folder exists, if not, create it
         if (-not (Test-Path -Path $CompleteFolderPath)) {
             New-Item -ItemType Directory -Path $CompleteFolderPath -Force | Out-Null
@@ -674,7 +688,9 @@ function New-FolderAtPath {
         return $CompleteFolderPath
     }
     catch [System.Exception] {
+        # Capture the function name for error context
         $functionName = $MyInvocation.MyCommand.Name
+        # Handle the error and log it
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
         return $null    
     }
@@ -1561,14 +1577,8 @@ function Invoke-LLMChatCompletion {
             }
             "LMStudio" {
                 # Handle streaming for LMStudio provider
-                if ($Stream) {
-                    Write-Information "-- Streaming is not implemented yet. Displaying information instead." -InformationAction Continue
-                    $script:stream = $false
-                    $stream = $false
-                    $script:GlobalState.Stream = $false
-                }
                 # Invoke the LMStudio chat completion function
-                $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey "lm-studio" -endpoint "http://localhost:1234/v1/chat/completions"
+                $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey $script:lmstudioApiKey -endpoint $script:lmstudioApiBase -Model $script:LMStudioModel
                 return $response
             }
             "OpenAI" {
@@ -1763,70 +1773,125 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         [string]$UserPrompt,
         [double]$Temperature,
         [double]$TopP,
-        [string]$Model = "",
-        [string]$ApiKey = "lm-studio",
-        [string]$endpoint = "http://localhost:1234/v1/chat/completions",
+        [string]$Model,
+        [string]$ApiKey,
+        [string]$endpoint,
+        [int]$timeoutSec = 240,
         [bool]$Stream
     )
     $response = ""
-    
-    # Test lm-studio
-    try {
-        $modelResponse = Invoke-RestMethod -Uri "http://localhost:1234/v1/models"
-        if ($modelResponse.data.id) {
-            $model = $modelResponse.data.id
-        }
-    }
-    catch [System.Net.WebException] {
-        #System.InvalidOperationException
-        Write-Warning "LM Studio server is not running or not reachable. Please ensure the server is up and running at $endpoint."
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
-        Throw $_
-    }
-    catch {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt") -ErrorRecord $_
-        #Throw $_.Exception.Message
-    }
-
 
     $headers = @{
         "Content-Type"  = "application/json"
         "Authorization" = "Bearer '$ApiKey'"
     }
-    $bodyJSON = @{
-        model       = $Model
-        messages    = @(
+    $bodyJSON = [pscustomobject]@{
+        'model'       = $Model
+        'messages'    = @(
             @{
-                role    = "system"
-                content = $SystemPrompt
+                'role'    = 'system'
+                'content' = $SystemPrompt
             },
             @{
-                role    = "user"
-                content = $UserPrompt
+                'role'    = 'user'
+                'content' = $UserPrompt
             }
         )
-        temperature = $Temperature
-        top_p       = $TopP
+        'temperature' = $Temperature
+        'top_p'       = $TopP
+        'stream'      = $stream
+        'max_tokens'  = 4096
     } | ConvertTo-Json
 
     # Call lm-studio
-    $InfoText = "++ LM Studio" + $(if ($Model) { " ($Model)" } else { "" }) + " is working..."
-    Write-Host $InfoText
+    #if ($modelResponse.data.Count -ne 0) {
+        $InfoText = "++ LM Studio" + $(if ($Model) { " ($Model)" } else { "" }) + " is working..."
+        Write-Host $InfoText
+    #}
 
-    try {
-        $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method POST -Body $bodyJSON -TimeoutSec 240
+    $url = "$($endpoint)chat/completions"
+
+    # Check if streaming is enabled and handle accordingly
+    if ($Stream) {
+        # Create an instance of HttpClientHandler and disable buffering
+        $httpClientHandler = [System.Net.Http.HttpClientHandler]::new()
+        $httpClientHandler.AllowAutoRedirect = $false
+        $httpClientHandler.UseCookies = $false
+        $httpClientHandler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
+        
+        # Create an instance of HttpClient
+        $httpClient = [System.Net.Http.HttpClient]::new($httpClientHandler)
+            
+        # Set the required headers
+        $httpClient.DefaultRequestHeaders.Add("api-key", $script:lmstudioApiKey)
+            
+        # Set the timeout for the HttpClient
+        $httpClient.Timeout = New-TimeSpan -Seconds $timeoutSec
+        
+        # Create the HttpContent object with the request body
+        $content = [System.Net.Http.StringContent]::new($bodyJSON, [System.Text.Encoding]::UTF8, "application/json")
+     
+        $request = New-Object System.Net.Http.HttpRequestMessage ([System.Net.Http.HttpMethod]::Post, $url)
+        $request.Content = $content
+     
+        # Send the HTTP POST request asynchronously with HttpCompletionOption.ResponseHeadersRead
+        $response = $httpClient.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+    
+        # Ensure the request was successful
+        if (-not $response.IsSuccessStatusCode) {
+            Write-Host "-- Response was not successful: $($response.StatusCode) - $($response.ReasonPhrase)"
+            return
+        }
+    
+        # Get the response stream
+        $stream_ = $response.Content.ReadAsStreamAsync().Result
+        $reader = [System.IO.StreamReader]::new($stream_)
+    
+        Write-Host "++ Streaming." -ForegroundColor Blue
+
+        # Initialize the completeText variable
+        $completeText = ""
+        while ($null -ne ($line = $reader.ReadLine()) -or (-not $reader.EndOfStream)) {
+            # Check if the line starts with "data: " and is not "data: [DONE]"
+            Write-Verbose $line
+            if ($line.StartsWith("data: ") -and $line -ne "data: [DONE]") {
+                # Extract the JSON part from the line
+                $jsonPart = $line.Substring(6)    
+                if ($completeText.EndsWith('+')) {
+                    $completeText = $completeText.Substring(0, $completeText.Length - 1)
+                }
+                try {
+                    # Parse the JSON part
+                    $parsedJson = $jsonPart | ConvertFrom-Json
+                    # Extract the text and append it to the complete text - Chat Completion
+                    $delta = $parsedJson.choices[0].delta.content
+                    $completeText += $delta
+                    Write-Host $delta -NoNewline -ForegroundColor White
+                }
+                catch {
+                    Write-Error $_
+                }
+            }
+        }
+        Write-Host ""
+        $completeText += "`n"
+    
+        if ($VerbosePreference -eq "Continue") {
+            Write-Verbose "Streaming completed. Full text: $completeText"
+        }
+        else {
+            Write-Host "++ Streaming completed." -ForegroundColor Blue
+        }
+        # Clean up
+        $reader.Close()
+        $httpClient.Dispose()
+
+        $response = $completeText
     }
-    catch [System.InvalidOperationException] {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
-        Throw $_
-    }
-    catch {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
-        Throw $_
+    else {
+        # Send a non-streaming HTTP POST request and parse the response
+        $response = Invoke-RestMethod -Uri "$($endpoint)chat/completions" -Headers $headers -Method POST -Body $bodyJSON -TimeoutSec $timeoutSec
+        $response = $($response.Choices[0].message.content).trim()
     }
 
     # Log the prompt and response to the log file
@@ -1834,18 +1899,17 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         Timestamp    = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
         SystemPrompt = $SystemPrompt
         UserPrompt   = $UserPrompt
-        Response     = $response.choices[0]
+        Response     = $response
     } | ConvertTo-Json
     
-    $this.Log.Add($logEntry)
+    [void]($this.Log.Add($logEntry))
     # Log the summary
-    $this.AddLogEntry("SystemPrompt:`n$SystemPrompt")
-    $this.AddLogEntry("UserPrompt:`n$UserPrompt")
-    $this.AddLogEntry("Response:`n$($Response | convertto-JSON)")
+    [void]($this.AddLogEntry("SystemPrompt:`n$SystemPrompt"))
+    [void]($this.AddLogEntry("UserPrompt:`n$UserPrompt"))
+    [void]($this.AddLogEntry("Response:`n$Response"))
 
-    return $response.Choices[0].message.content
+    return $response
 }
-
 
 function Invoke-BingWebSearch {
     param (
@@ -1883,7 +1947,7 @@ function Invoke-BingWebSearch {
     }
 
     # If the query length is greater than 50 characters, truncate it to 50 characters
-    $maxqueryLength = 100
+    $maxqueryLength = 120
     if ($query.Length -gt $maxqueryLength) {
         Write-Host "Query length is greater than $maxqueryLength characters. Truncating the query."
         $query = $query.Substring(0, $maxqueryLength)
@@ -2397,7 +2461,7 @@ function Set-OllamaModel {
     [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $model, 'User')
 }
 
-function Ensure-OllamaModelRunning {
+function Test-EnsureOllamaModelRunning {
     param ($attempts = 10, $delay = 2)
     for ($i = 0; $i -lt $attempts; $i++) {
         $runningModel = Test-OllamaRunningModel
@@ -2525,7 +2589,7 @@ if ($LLMProvider -eq 'ollama') {
         if (Start-OllamaModel) {
             $runningModel = Test-OllamaRunningModel -NOInfo
             if ($runningModel) {
-                if (Ensure-OllamaModelRunning) {
+                if (Test-EnsureOllamaModelRunning) {
                     Set-OllamaModel -model $runningModel
                 }
             }
@@ -2534,6 +2598,82 @@ if ($LLMProvider -eq 'ollama') {
     Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
 }
 #endregion ollama
+
+#region LMStudio
+# Check if the LLM provider is 'lmstudio'
+if ($LLMProvider -eq 'lmstudio') {
+    # Retrieve the LM Studio API key from the environment variables
+    $script:lmstudioApiKey = [System.Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'user')
+    # Retrieve the LM Studio API base URL from the environment variables
+    $script:lmstudioApiBase = [System.Environment]::GetEnvironmentVariable('OPENAI_API_BASE', 'user')
+    $env:OPENAI_API_KEY = $script:lmstudioApiKey
+    $env:OPENAI_API_BASE = $script:lmstudioApiBase
+    # If the API key is not set, use the default value 'lm-studio' and set it in the environment variables
+    if (-not $script:lmstudioApiKey) {
+        $script:lmstudioApiKey = 'lm-studio'
+        $env:OPENAI_API_KEY = $script:lmstudioApiKey
+        [System.Environment]::SetEnvironmentVariable('OPENAI_API_KEY', $script:lmstudioApiKey, 'user')
+        Write-Verbose "++ Default LM Studio API key set to 'lm-studio'"
+    }
+
+    # If the API base URL is not set, use the default value 'http://localhost:1234/v1' and set it in the environment variables
+    if (-not $script:lmstudioApiBase) {
+        $script:lmstudioApiBase = 'http://localhost:1234/v1'
+        $env:OPENAI_API_BASE = $script:lmstudioApiBase
+        [System.Environment]::SetEnvironmentVariable('OPENAI_API_BASE', $script:lmstudioApiBase, 'user')
+        Write-Verbose "++ Default LM Studio API base set to 'http://localhost:1234/v1'"
+    }
+
+        # Ensure the LMStudio endpoint ends with a '/'
+        if (-not $script:lmstudioApiBase.EndsWith('/')) {
+            $script:lmstudioApiBase += '/'
+        }
+
+    try {
+        $LMStudioServerResponse = Invoke-WebRequest -Uri $script:lmstudioApiBase
+        if ($LMStudioServerResponse.statuscode -eq "200") {
+            Write-Host "++ LM Studio server is running." -ForegroundColor Green
+        }
+        else {
+            Write-Host "-- LM Studio server not running." -ForegroundColor Yellow
+            return
+        }
+    }
+    catch [System.Net.WebException] {
+        Write-Warning "LM Studio server is not running or not reachable. Please ensure the server is up and running at $($script:lmstudioApiBase)."
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "LM Studio server is not running or not reachable"
+        Throw $_
+    }
+    catch {
+        Update-ErrorHandling -ErrorContext "LM Studio server is not running or not reachable"-ErrorRecord $_
+    }
+    # Test lm-studio for model
+    try {
+        $LMStudioModelResponse = Invoke-RestMethod -Uri "$($script:lmstudioApiBase)models" -Method GET
+        if ($LMStudioModelResponse.data.Count -eq 0) {
+            Write-Host "-- No models loaded. Please load a model in LM Studio first."
+            return
+        }
+        elseif ($LMStudioModelResponse.data.Count -gt 1) {
+            Write-Host "++ LM Studio is running in Multi Model Session. Only one model can be chosen. Choosing the first one."
+        }
+        if ($LMStudioModelResponse.data[0].id) {
+            $script:LMStudioModel = $LMStudioModelResponse.data[0].id
+        }
+    }
+    catch [System.Net.WebException] {
+        #System.InvalidOperationException
+        Write-Warning "LM Studio server is not running or not reachable. Please ensure the server is up and running at $($script:lmstudioApiBase)."
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "LM Studio server is not running or not reachable"
+        Throw $_
+    }
+    catch {
+        Update-ErrorHandling -ErrorContext "LM Studio server is not running or not reachable" -ErrorRecord $_
+        #Throw $_.Exception.Message
+    }
+
+}
+#endregion LMStudio
 
 $scriptname = "AIPSTeam"
 if ($LoadProjectStatus) {
