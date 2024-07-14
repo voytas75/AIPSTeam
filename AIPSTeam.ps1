@@ -7,7 +7,7 @@
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
 .RELEASENOTES
-3.4.2[unpublished]: 
+3.4.2[unpublished]: minor changes and bug fixes, fix userInput value from pipeline (issue #4).
 3.3.2: minor changes and fixes, add streaming http response to ollama.
 3.2.1: minor changes and fixes, issue #2 - add env for ollama endpoint
 3.1.1: moved PM exec, Test-ModuleMinVersion, add iconuri, minor fixes, optimize ollama manager logic, code cleanup.
@@ -105,9 +105,10 @@ Creation Date: 05.2024
 https://www.powershellgallery.com/packages/AIPSTeam
 https://github.com/voytas75/AIPSTeam/
 #>
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $false, ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string.")]
-    [string] $userInput = $(if ($null -eq $userInput) { Read-Host "Please provide the project outline" }),
+    [string] $userInput,
 
     [Parameter(Mandatory = $false, HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
     [bool] $Stream = $true,
@@ -264,6 +265,7 @@ class ProjectTeam {
                 if (-not [string]::IsNullOrEmpty($response)) {
                     break
                 }
+                Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
                 Start-Sleep -Seconds 10
                 $loopCount++
             } while ($loopCount -lt $maxLoops)
@@ -333,6 +335,7 @@ class ProjectTeam {
                 if (-not [string]::IsNullOrEmpty($response)) {
                     break
                 }
+                Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
                 Start-Sleep -Seconds 10
                 $loopCount++
             } while ($loopCount -lt $maxLoops)
@@ -405,6 +408,7 @@ class ProjectTeam {
                 if (-not [string]::IsNullOrEmpty($response)) {
                     break
                 }
+                Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
                 Start-Sleep -Seconds 10
                 $loopCount++
             } while ($loopCount -lt $maxLoops)
@@ -489,10 +493,10 @@ class ProjectTeam {
             $maxLoops = 5
             do {
                 $summary = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $fullPrompt -UserPrompt "" -Temperature 0.7 -TopP 0.7 -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
-
                 if (-not [string]::IsNullOrEmpty($summary)) {
                     break
                 }
+                Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
                 Start-Sleep -Seconds 10
                 $loopCount++
             } while ($loopCount -lt $maxLoops)
@@ -2404,23 +2408,28 @@ function Ensure-OllamaModelRunning {
 #endregion Functions
 
 #region Setting Up
-# Check if the PSAOAI module is installed and meets the minimum version requirement
-#if (-not (Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion 0.3.2) -and $LLMProvider -eq "AzureOpenAI") {
-#    Write-Host "The PSAOAI module is not at the required version (0.3.2). Please update it using 'Update-Module PSAOAI' or install it using 'Install-Module PSAOAI'." #-ForegroundColor Yellow
-#}
-
 # Save the original UI culture to restore it later
 $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
 
 # Set the current UI culture to 'en-US' for consistent behavior
 [void]([Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US'))
 
+# Check if the PSAOAI module version is at least 0.3.2
+if ( Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
+    # Import the PSAOAI module forcefully
+    [void](Import-module -name PSAOAI -Force)
+}
+else {
+    # Display a warning message if the required module version is not installed
+    Write-Warning "-- You need to install/update PSAOAI module version >= 0.3.2. Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
+    return
+}
+
 # Disable RAG (Retrieve and Generate) functionality if the NORAG switch is set
 $RAG = $true
 if ($NORAG) {
     $RAG = $false
 }
-
 
 # Define a state management object
 $GlobalState = [PSCustomObject]@{
@@ -2447,14 +2456,14 @@ $GlobalState.LogFolder = $LogFolder
 [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
 $env:PSAOAI_BANNER = "0"
 
-#if ((Get-Module -ListAvailable -Name PSAOAI | Where-Object { [version]$_.version -ge [version]"0.3.2" })) {
-if (    Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
-    [void](Import-module -name PSAOAI -Force)
+# Check if the UserInput parameter is not provided
+if (-not $UserInput) {
+    # Prompt the user to enter the PowerShell project description
+    $UserInput = Read-Host "Please enter the PowerShell project description"
+    # Store the user input in the GlobalState object
+    $GlobalState.UserInput = $UserInput
 }
-else {
-    Write-Warning "-- You need to install/update PSAOAI module version >= 0.3.2. Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
-    return
-}
+
 Show-Banner
 
 #region ollama
@@ -2498,9 +2507,9 @@ if ($LLMProvider -eq 'ollama') {
             return
         }
     }
-    #else {
-    #    Write-Host "++ Ollama is running."
-    #}
+    else {
+        Write-Verbose "++ Ollama is running."
+    }
 
     # Ensure a model is running
     $runningModelOllama = Test-OllamaRunningModel
