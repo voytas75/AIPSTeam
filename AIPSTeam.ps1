@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.4.2
+.VERSION 3.4.3
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -71,7 +71,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.4.2
+Version: 3.4.3
 Author: voytas75
 Creation Date: 05.2024
 
@@ -121,7 +121,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.4.2"
+$AIPSTeamVersion = "3.4.3"
 
 #region ProjectTeamClass
 <#
@@ -2298,7 +2298,8 @@ function Start-OllamaModel {
     $ollamaPath = Test-OllamaInstalled
     if (-not $ollamaPath) {
         Write-Host "-- Ollama is not found in PATH. Make sure it's installed and in your system PATH."
-        return $false
+        #return $false
+        # ollama can be run on remote computer
     }
 
     try {
@@ -2394,6 +2395,44 @@ function Test-OllamaInstalled {
     }
 }
 
+function Test-OllamaAPI {
+    <#
+    .SYNOPSIS
+        Tests if the Ollama API is currently accessible.
+
+    .DESCRIPTION
+        This function sends a request to the Ollama API endpoint to check if it is accessible and responding.
+        It returns $true if the API is accessible, and $false otherwise.
+
+    .EXAMPLE
+        Test-OllamaAPI
+        Returns $true if the Ollama API is accessible, otherwise $false.
+
+    .NOTES
+        Author: YourName
+        Date: 2024.07.10
+    #>
+    param (
+        [string]$apiEndpoint = "$($script:ollamaEndpoint)"
+    )
+
+    try {
+        $response = Invoke-RestMethod -Uri $apiEndpoint -Method Get -ErrorAction Stop
+        if ($response -eq "Ollama is running") {
+            Write-Host "++ Ollama API is accessible."
+            return $true
+        }
+        else {
+            Write-Host "-- Ollama API is not accessible or returned an unexpected status."
+            return $false
+        }
+    }
+    catch {
+        Write-Host "-- An error occurred while checking the Ollama API: $_"
+        return $false
+    }
+}
+
 function Test-OllamaRunning {
     <#
     .SYNOPSIS
@@ -2428,7 +2467,7 @@ function Test-OllamaRunning {
     }
 }
 
-function Set-OllamaModel {
+function Set-EnvOllamaModel {
     param ($model)
     $env:OLLAMA_MODEL = $model
     $script:ollamaModel = $model
@@ -2440,7 +2479,7 @@ function Test-EnsureOllamaModelRunning {
     for ($i = 0; $i -lt $attempts; $i++) {
         $runningModel = Test-OllamaRunningModel
         if ($runningModel) {
-            Set-OllamaModel -model $runningModel
+            Set-EnvOllamaModel -model $runningModel
             return $true
         }
         Start-OllamaModel
@@ -2511,11 +2550,15 @@ Show-Banner
 
 #region ollama
 if ($LLMProvider -eq 'ollama') {
-    [uri]$script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
+    $script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
+    if (-not $script:ollamaEndpoint.EndsWith('/')) {
+        $script:ollamaEndpoint += '/'
+    }
+
     if ([string]::IsNullOrEmpty($script:ollamaEndpoint)) {
         $defaultEndpoint = 'http://localhost:11434/'
         try {
-            [uri]$script:ollamaEndpoint = $defaultEndpoint
+            $script:ollamaEndpoint = $defaultEndpoint
             $env:OLLAMA_ENDPOINT = $defaultEndpoint
             [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', $defaultEndpoint, 'user')
             if ([System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')) {
@@ -2529,46 +2572,64 @@ if ($LLMProvider -eq 'ollama') {
     }
 
     # Check if Ollama is installed
-    $ollamaInstalled = Test-OllamaInstalled
-    if (-not $ollamaInstalled) {
-        Write-Warning "-- Ollama is not installed. Please install Ollama and ensure it is in your PATH."
-        return
+    #$ollamaInstalled = Test-OllamaInstalled
+    #if (-not $ollamaInstalled) {
+    #    Write-Warning "-- Ollama is not installed. Please install Ollama and ensure it is in your PATH."
+    #    return
+    #}
+    #else {
+    #    Write-Host "++ Ollama is installed at: $ollamaInstalled"
+    #}
+    # Test if the Ollama API is reachable
+    if (Test-OllamaAPI) {
+        Write-Host "++ Ollama API is reachable."
+        
+        # Check if Ollama is running with a model
+        $runningModelOllama = Test-OllamaRunningModel
+        if ($runningModelOllama) {
+            Write-Host "++ Ollama is running with model: $runningModelOllama"
+            Set-EnvOllamaModel -model $runningModelOllama
+        }
+        else {
+            Write-Host "-- No models are currently running in Ollama. Please check your Ollama configuration."
+        }
     }
     else {
-        Write-Host "++ Ollama is installed at: $ollamaInstalled"
+        Write-Warning "-- Ollama API is not reachable. Please check your Ollama installation and configuration."
     }
 
     # Check if Ollama is running
-    $ollamaRunning = Test-OllamaRunning
-    if (-not $ollamaRunning) {
-        Write-Host "-- Ollama is not running. Attempting to start Ollama..." -ForegroundColor Yellow
-        if (Start-OllamaInNewConsole) {
-            Write-Host "++ Ollama started successfully."
-        }
-        else {
-            Write-Warning "Failed to start Ollama."
-            return
-        }
-    }
-    else {
-        Write-Verbose "++ Ollama is running."
-    }
+    #$ollamaRunning = Test-OllamaRunning
+    #if (-not $ollamaRunning) {
+    #    Write-Host "-- Ollama is not running. Attempting to start Ollama..." -ForegroundColor Yellow
+    #    if (Start-OllamaInNewConsole) {
+    #        Write-Host "++ Ollama started successfully."
+    #    }
+    #    else {
+    #        Write-Warning "Failed to start Ollama."
+    #        return
+    #    }
+    #}
+    #else {
+    #    Write-Verbose "++ Ollama is running."
+    #}
 
     # Ensure a model is running
-    $runningModelOllama = Test-OllamaRunningModel
-    if ($runningModelOllama) {
-        Set-OllamaModel -model $runningModelOllama
-    }
-    else {
-        if (Start-OllamaModel) {
-            $runningModel = Test-OllamaRunningModel -NOInfo
-            if ($runningModel) {
-                if (Test-EnsureOllamaModelRunning) {
-                    Set-OllamaModel -model $runningModel
-                }
-            }
-        }
-    }
+    #$runningModelOllama = Test-OllamaRunningModel
+    #if ($runningModelOllama) {
+    #    Set-EnvOllamaModel -model $runningModelOllama
+    #}
+    #else {
+    #    if (Start-OllamaModel) {
+    #        $runningModel = Test-OllamaRunningModel -NOInfo
+    #        if ($runningModel) {
+    #            if (Test-EnsureOllamaModelRunning) {
+    #                Set-EnvOllamaModel -model $runningModel
+    #            }
+    #        }
+    #    }
+    #Write-Host "-- No models are currently running in Ollama. Please check your server and settings." -ForegroundColor Red
+    #}
     Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
 }
 #endregion ollama

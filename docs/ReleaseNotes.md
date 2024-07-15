@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.4.3] - 2024.07.15
+
+- issue #7.
+- minor fixes.
+
 ## [3.4.2] - 2024.07.14
 
 - minor changes and bug fixes, fix userInput value from pipeline (issue #4), add lm studio support (issue #5).
