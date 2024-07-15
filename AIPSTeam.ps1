@@ -1664,7 +1664,13 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
 
         # Call Azure OpenAI API
         Write-Host "++ AZURE OpenaAI ($Deployment) is working..."
+        if ($Stream) {
+            Write-Host "++ Streaming" -ForegroundColor Blue
+        }
         $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt 
+        if ($Stream) {
+            Write-Host "++ Streaming completed." -ForegroundColor Blue
+        }
 
         # Check if the response is null or empty
         #if ([string]::IsNullOrEmpty($response)) {
