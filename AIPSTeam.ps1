@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.4.2
+.VERSION 3.4.3
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -71,7 +71,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.4.2
+Version: 3.4.3
 Author: voytas75
 Creation Date: 05.2024
 
@@ -121,7 +121,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.4.2"
+$AIPSTeamVersion = "3.4.3"
 
 #region ProjectTeamClass
 <#
@@ -2550,11 +2550,15 @@ Show-Banner
 
 #region ollama
 if ($LLMProvider -eq 'ollama') {
-    [uri]$script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
+    $script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
+    if (-not $script:ollamaEndpoint.EndsWith('/')) {
+        $script:ollamaEndpoint += '/'
+    }
+
     if ([string]::IsNullOrEmpty($script:ollamaEndpoint)) {
         $defaultEndpoint = 'http://localhost:11434/'
         try {
-            [uri]$script:ollamaEndpoint = $defaultEndpoint
+            $script:ollamaEndpoint = $defaultEndpoint
             $env:OLLAMA_ENDPOINT = $defaultEndpoint
             [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', $defaultEndpoint, 'user')
             if ([System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')) {
@@ -2611,11 +2615,11 @@ if ($LLMProvider -eq 'ollama') {
     #}
 
     # Ensure a model is running
-    $runningModelOllama = Test-OllamaRunningModel
-    if ($runningModelOllama) {
-        Set-EnvOllamaModel -model $runningModelOllama
-    }
-    else {
+    #$runningModelOllama = Test-OllamaRunningModel
+    #if ($runningModelOllama) {
+    #    Set-EnvOllamaModel -model $runningModelOllama
+    #}
+    #else {
     #    if (Start-OllamaModel) {
     #        $runningModel = Test-OllamaRunningModel -NOInfo
     #        if ($runningModel) {
@@ -2624,8 +2628,8 @@ if ($LLMProvider -eq 'ollama') {
     #            }
     #        }
     #    }
-    Write-Host "-- No models are currently running in Ollama. Please check your server and settings." -ForegroundColor Red
-    }
+    #Write-Host "-- No models are currently running in Ollama. Please check your server and settings." -ForegroundColor Red
+    #}
     Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
 }
 #endregion ollama
