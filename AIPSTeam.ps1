@@ -2584,10 +2584,10 @@ if ($LLMProvider -eq 'ollama') {
         $runningModelOllama = Test-OllamaRunningModel
         if ($runningModelOllama) {
             Write-Host "++ Ollama is running with model: $runningModelOllama"
-            #Set-EnvOllamaModel -model $runningModelOllama
+            Set-EnvOllamaModel -model $runningModelOllama
         }
         else {
-            Write-Host "-- No models are currently running in Ollama."
+            Write-Host "-- No models are currently running in Ollama. Please check your Ollama configuration."
         }
     }
     else {
