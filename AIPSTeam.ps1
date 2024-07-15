@@ -2467,7 +2467,7 @@ function Test-OllamaRunning {
     }
 }
 
-function Set-OllamaModel {
+function Set-EnvOllamaModel {
     param ($model)
     $env:OLLAMA_MODEL = $model
     $script:ollamaModel = $model
@@ -2479,7 +2479,7 @@ function Test-EnsureOllamaModelRunning {
     for ($i = 0; $i -lt $attempts; $i++) {
         $runningModel = Test-OllamaRunningModel
         if ($runningModel) {
-            Set-OllamaModel -model $runningModel
+            Set-EnvOllamaModel -model $runningModel
             return $true
         }
         Start-OllamaModel
@@ -2584,7 +2584,7 @@ if ($LLMProvider -eq 'ollama') {
         $runningModelOllama = Test-OllamaRunningModel
         if ($runningModelOllama) {
             Write-Host "++ Ollama is running with model: $runningModelOllama"
-            #Set-OllamaModel -model $runningModelOllama
+            #Set-EnvOllamaModel -model $runningModelOllama
         }
         else {
             Write-Host "-- No models are currently running in Ollama."
@@ -2593,37 +2593,38 @@ if ($LLMProvider -eq 'ollama') {
     else {
         Write-Warning "-- Ollama API is not reachable. Please check your Ollama installation and configuration."
     }
-return
+
     # Check if Ollama is running
-    $ollamaRunning = Test-OllamaRunning
-    if (-not $ollamaRunning) {
-        Write-Host "-- Ollama is not running. Attempting to start Ollama..." -ForegroundColor Yellow
-        if (Start-OllamaInNewConsole) {
-            Write-Host "++ Ollama started successfully."
-        }
-        else {
-            Write-Warning "Failed to start Ollama."
-            return
-        }
-    }
-    else {
-        Write-Verbose "++ Ollama is running."
-    }
+    #$ollamaRunning = Test-OllamaRunning
+    #if (-not $ollamaRunning) {
+    #    Write-Host "-- Ollama is not running. Attempting to start Ollama..." -ForegroundColor Yellow
+    #    if (Start-OllamaInNewConsole) {
+    #        Write-Host "++ Ollama started successfully."
+    #    }
+    #    else {
+    #        Write-Warning "Failed to start Ollama."
+    #        return
+    #    }
+    #}
+    #else {
+    #    Write-Verbose "++ Ollama is running."
+    #}
 
     # Ensure a model is running
     $runningModelOllama = Test-OllamaRunningModel
     if ($runningModelOllama) {
-        Set-OllamaModel -model $runningModelOllama
+        Set-EnvOllamaModel -model $runningModelOllama
     }
     else {
-        if (Start-OllamaModel) {
-            $runningModel = Test-OllamaRunningModel -NOInfo
-            if ($runningModel) {
-                if (Test-EnsureOllamaModelRunning) {
-                    Set-OllamaModel -model $runningModel
-                }
-            }
-        }
+    #    if (Start-OllamaModel) {
+    #        $runningModel = Test-OllamaRunningModel -NOInfo
+    #        if ($runningModel) {
+    #            if (Test-EnsureOllamaModelRunning) {
+    #                Set-EnvOllamaModel -model $runningModel
+    #            }
+    #        }
+    #    }
+    Write-Host "-- No models are currently running in Ollama. Please check your server and settings." -ForegroundColor Red
     }
     Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
 }
