@@ -2298,7 +2298,8 @@ function Start-OllamaModel {
     $ollamaPath = Test-OllamaInstalled
     if (-not $ollamaPath) {
         Write-Host "-- Ollama is not found in PATH. Make sure it's installed and in your system PATH."
-        return $false
+        #return $false
+        # ollama can be run on remote computer
     }
 
     try {
@@ -2390,6 +2391,44 @@ function Test-OllamaInstalled {
     }
     catch {
         Write-Host "-- An error occurred while checking for Ollama installation: $_"
+        return $false
+    }
+}
+
+function Test-OllamaAPI {
+    <#
+    .SYNOPSIS
+        Tests if the Ollama API is currently accessible.
+
+    .DESCRIPTION
+        This function sends a request to the Ollama API endpoint to check if it is accessible and responding.
+        It returns $true if the API is accessible, and $false otherwise.
+
+    .EXAMPLE
+        Test-OllamaAPI
+        Returns $true if the Ollama API is accessible, otherwise $false.
+
+    .NOTES
+        Author: YourName
+        Date: 2024.07.10
+    #>
+    param (
+        [string]$apiEndpoint = "$($script:ollamaEndpoint)"
+    )
+
+    try {
+        $response = Invoke-RestMethod -Uri $apiEndpoint -Method Get -ErrorAction Stop
+        if ($response -eq "Ollama is running") {
+            Write-Host "++ Ollama API is accessible."
+            return $true
+        }
+        else {
+            Write-Host "-- Ollama API is not accessible or returned an unexpected status."
+            return $false
+        }
+    }
+    catch {
+        Write-Host "-- An error occurred while checking the Ollama API: $_"
         return $false
     }
 }
@@ -2529,15 +2568,32 @@ if ($LLMProvider -eq 'ollama') {
     }
 
     # Check if Ollama is installed
-    $ollamaInstalled = Test-OllamaInstalled
-    if (-not $ollamaInstalled) {
-        Write-Warning "-- Ollama is not installed. Please install Ollama and ensure it is in your PATH."
-        return
+    #$ollamaInstalled = Test-OllamaInstalled
+    #if (-not $ollamaInstalled) {
+    #    Write-Warning "-- Ollama is not installed. Please install Ollama and ensure it is in your PATH."
+    #    return
+    #}
+    #else {
+    #    Write-Host "++ Ollama is installed at: $ollamaInstalled"
+    #}
+    # Test if the Ollama API is reachable
+    if (Test-OllamaAPI) {
+        Write-Host "++ Ollama API is reachable."
+        
+        # Check if Ollama is running with a model
+        $runningModelOllama = Test-OllamaRunningModel
+        if ($runningModelOllama) {
+            Write-Host "++ Ollama is running with model: $runningModelOllama"
+            #Set-OllamaModel -model $runningModelOllama
+        }
+        else {
+            Write-Host "-- No models are currently running in Ollama."
+        }
     }
     else {
-        Write-Host "++ Ollama is installed at: $ollamaInstalled"
+        Write-Warning "-- Ollama API is not reachable. Please check your Ollama installation and configuration."
     }
-
+return
     # Check if Ollama is running
     $ollamaRunning = Test-OllamaRunning
     if (-not $ollamaRunning) {
