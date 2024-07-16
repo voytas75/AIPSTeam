@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [3.5.2] - unpublished
 
+- add secret agent to clean RAG data.
+- minor fixes.
 
 ## [3.5.1] - 2024.07.15
 

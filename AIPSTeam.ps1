@@ -529,10 +529,13 @@ class ProjectTeam {
 #region Functions
 function Test-ModuleMinVersion {
     param (
+        [ValidateNotNullOrEmpty()]
         [string]$ModuleName,
+        [ValidateNotNullOrEmpty()]
         [version]$MinimumVersion
     )
 
+    # Function to check if a module with a minimum version is available
     $module = Get-Module -ListAvailable -Name $ModuleName | 
     Where-Object { $_.Version -ge $MinimumVersion } | 
     Select-Object -First 1
@@ -541,9 +544,11 @@ function Test-ModuleMinVersion {
         return $true
     }
     else {
+        Write-Error "Module $ModuleName with minimum version $MinimumVersion not found."
         return $false
     }
 }
+
 function SendFeedbackRequest {
     param (
         [string] $TeamMember, # The team member to send the feedback request to
@@ -735,15 +740,15 @@ function Show-Banner {
    https://github.com/voytas75/AIPSTeam
   
 '@
-    Write-Host @"
+    Write-Host @'
         This PowerShell script simulates a team of AI Agents working together on a PowerShell project. Each Agent has a 
         unique role and contributes to the project in a sequential manner. The script processes user input, performs 
         various tasks, and generates outputs such as code, documentation, and analysis reports. The application utilizes 
         Retrieval-Augmented Generation (RAG) to enhance its power and leverage Azure OpenAI, Ollama, or LM Studio to generate the output.
          
-"@ -ForegroundColor Blue
+'@ -ForegroundColor Blue
   
-    Write-Host @"
+    Write-Host @'
         "You never know what you're gonna get with an AI, just like a box of chocolates. You might get a whiz-bang algorithm that 
         writes you a symphony in five minutes flat, or you might get a dud that can't tell a cat from a couch. But hey, that's 
         the beauty of it all, you keep feedin' it data and see what kind of miraculous contraption it spits out next."
@@ -752,7 +757,7 @@ function Show-Banner {
                                                                       ...maybe it was Skynet or maybe it was just your toaster :)
   
 
-"@ -ForegroundColor DarkYellow
+'@ -ForegroundColor DarkYellow
 }
 
 function Export-AndWritePowerShellCodeBlocks {
@@ -1144,7 +1149,7 @@ function Set-FeedbackAndGenerateResponse {
         # Generate the response based on the feedback
         #$responsePrompt = "Modify Powershell code with suggested improvements and optimizations based on $($Reviewer.Name) review. The previous version of the code has been shared below after the feedback block.`n`n````````text`n" + $($Reviewer.GetLastMemory().Response) + "`n`````````n`nHere is previous version of the code:`n`n``````powershell`n$($GlobalState.LastPSDevCode)`n```````n`nShow the new version of PowerShell code. Think step by step. Make sure your answer is unbiased. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks."
 
-        $responsePrompt =@"
+        $responsePrompt = @"
 
 Your task is to write next version of PowerShell code based on the following requirements and guidelines. Please follow these steps:
 
@@ -1439,6 +1444,28 @@ function Save-ProjectState {
         [PSCustomObject] $GlobalState  # Global state object containing project details
     )
     try {
+        # Create a hashtable to store the project state dynamically
+        $projectState = @{}
+        $GlobalState | Get-Member -MemberType Properties | ForEach-Object {
+            $projectState[$_.Name] = $GlobalState."$($_.Name)"
+        }
+        
+        # Export the project state to a file in XML format
+        $projectState | Export-Clixml -Path $FilePath
+    }    
+    catch [System.Exception] {
+        # Handle any exceptions that occur during the save process
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+    }
+}
+
+function Save-ProjectState_old {
+    param (
+        [string]$FilePath, # Path to save the project state
+        [PSCustomObject] $GlobalState  # Global state object containing project details
+    )
+    try {
         # Create a hashtable to store the project state
         $projectState = @{
             LastPSDevCode            = $GlobalState.lastPSDevCode            # Last PowerShell developer code
@@ -1457,6 +1484,7 @@ function Save-ProjectState {
             NOPM                     = $GlobalState.NOPM                     # Disable project manager flag
             RAG                      = $GlobalState.RAG                      # RAG (Retrieve and Generate) functionality flag
             Stream                   = $GlobalState.Stream                   # Stream output flag
+            LLMProvider              = $GlobalState.LLMProvider              # LLM provide name
         }
         
         # Export the project state to a file in XML format
@@ -1470,6 +1498,41 @@ function Save-ProjectState {
 }
 
 function Get-ProjectState {
+    param (
+        [string]$FilePath
+    )
+    try {
+        # Check if the specified file path exists
+        if (Test-Path -Path $FilePath) {
+            # Import the project state from the XML file
+            $projectState = Import-Clixml -Path $FilePath
+            
+            # Dynamically update the GlobalState object with the imported project state values
+            $projectState.PSObject.Properties | ForEach-Object {
+                if ($GlobalState.PSObject.Properties["$($_.Name)"].IsReadOnly -eq $false) {
+                    $GlobalState."$($_.Name)" = $_.Value
+                }
+                else {
+                    Write-Warning "The property '$($_.Name)' is read-only and cannot be set."
+                }
+            }
+            
+            # Return the updated GlobalState object
+            return $GlobalState
+        }
+        else {
+            # Inform the user that the project state file was not found
+            Write-Host "-- Project state file not found."
+        }
+    }    
+    catch [System.Exception] {
+        # Handle any exceptions that occur during the process
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path (split-path -Path $FilePath -Parent) "ERROR.txt")  
+    }
+}
+
+function Get-ProjectState_old {
     param (
         [string]$FilePath
     )
@@ -1496,6 +1559,7 @@ function Get-ProjectState {
             $GlobalState.NOPM = $projectState.NOPM
             $GlobalState.RAG = $projectState.RAG
             $GlobalState.Stream = $projectState.Stream
+            $GlobalState.LLMProvider = $projectState.LLMProvider
             
             # Return the updated GlobalState object
             return $GlobalState
@@ -1843,8 +1907,8 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
 
     # Call lm-studio
     #if ($modelResponse.data.Count -ne 0) {
-        $InfoText = "++ LM Studio" + $(if ($Model) { " ($Model)" } else { "" }) + " is working..."
-        Write-Host $InfoText
+    $InfoText = "++ LM Studio" + $(if ($Model) { " ($Model)" } else { "" }) + " is working..."
+    Write-Host $InfoText
     #}
 
     $url = "$($endpoint)chat/completions"
@@ -2074,6 +2138,50 @@ function Remove-StringDirtyData {
     # Join the lines back into a single string
     $cleanedString = $lines -join "`n"
 
+    #region Cleaning RAG Raw Data
+    # This section is responsible for cleaning raw data obtained from RAG (Retrieve and Generate) processes.
+    # The goal is to ensure that the text is free from artifacts, irregular spacing, and formatting issues
+    # that may have resulted from HTML removal or other preprocessing steps.
+    # The cleaned text should be readable, well-formatted, and maintain its original structure and meaning.
+    # The cleaning process involves removing HTML entities, excessive blank lines, and other artifacts,
+    # as well as correcting spacing issues, standardizing quotation marks, and ensuring proper capitalization.
+    # The cleaned text is then processed by an LLM (Language Learning Model) to further refine and ensure
+    # the quality of the output.
+    #endregion Cleaning RAG Raw Data
+    Write-Host "++ Cleaning RAG Raw Data: Ensuring the text is free from artifacts, irregular spacing, and formatting issues." -ForegroundColor Cyan
+    
+    # Define the LLM system prompt for cleaning the string
+    $LLMSystemPrompt = @"
+You are an expert text processor specializing in cleaning and formatting web content. Your task is to process text that originally came from HTML but has already had its HTML tags removed. The text may still contain artifacts, irregular spacing, or formatting issues from the HTML removal process. Your goal is to produce clean, readable text.
+"@
+
+    # Define the user prompt with the input string
+    $LLMUserPrompt = @"
+Please process the following text:
+
+``````
+$cleanedString
+``````
+
+In your processing:
+
+1. Remove any remaining HTML entities (e.g., &nbsp;, &amp;, &#39;) and replace them with their appropriate characters.
+2. Eliminate excessive blank lines, reducing multiple consecutive blank lines to a single blank line for paragraph separation.
+3. Remove any lingering HTML-related artifacts that don't make sense in plain text (e.g., stray brackets, incomplete tags).
+4. Correct obvious spacing issues, ensuring there's a space after punctuation marks and between words.
+5. Standardize quotation marks and apostrophes (use straight quotes ' and " instead of curly quotes).
+6. Ensure proper capitalization at the beginning of sentences.
+7. Remove any repeated words that might have resulted from improper tag removal.
+8. Preserve intentional line breaks for items like addresses or poetry, but remove unnecessary line breaks within paragraphs.
+9. If you encounter any lists, ensure they are formatted consistently with appropriate indentation or numbering.
+10. Correct any obvious spelling errors that may have resulted from improper character encoding.
+
+Present the cleaned text, maintaining its original structure and meaning as much as possible. If you make any significant changes or corrections, briefly explain your reasoning at the end of the processed text.
+"@
+
+    # Invoke the LLM to clean the string
+    $cleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider -SystemPrompt $LLMSystemPrompt -UserPrompt $LLMUserPrompt -Temperature 0.7 -TopP 0.9 -MaxTokens 20500 -Stream $false -LogFolder $GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+    
     return $cleanedString
 }
 
@@ -2089,15 +2197,7 @@ function Invoke-RAG {
     $shortenedUserInput = ""
     try {
 
-        # Shorten the user input to be used as a query for Bing search
-        $websearchinstructions = @"
-To create effective query for the Azure Bing Web Search API, summarize given text and follow these best practices:
-1. Use specific keywords: Choose concise and precise terms that clearly define your search intent to increase result relevance.
-2. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine your queries. Use 'site:' for domain-specific searches.
-3. Must remove from the begin and end of query quotation marks or other characters.
-"@
-
-$RAGSystemPrompt = @"
+        $RAGSystemPrompt = @"
 You are a Web Search Query Manager. Your task is to suggest the best query for the Azure Bing Web Search API based on the user's input. To create an effective query, summarize the given text and follow these best practices:
 
 1. Use specific keywords: Choose concise and precise terms that clearly define the search intent to increase result relevance.
@@ -2114,13 +2214,13 @@ Examples of well-formed queries:
 Respond with the optimized query only.
 "@
 
-$RAGUserPrompt = @"
+        $RAGUserPrompt = @"
 Create an optimized web search query based on the following text:
 ````````text
 $($userInput.trim())
 ````````
 "@
-        #$shortenedUserInput = ($RAGAgent.ProcessInput("You must summarize and craft short query with a few terms optimized for Web query based on the text: '$userInput'. Examples: 'Powershell, code review, script parsing OR analyzing','Powershell code AND psscriptanalyzer','Powershell AND azure data logger AND event log'. You must respond with query only.", "Assistant is a Web Search Query Manager. Assistant's task is to suggest best query. $websearchinstructions")).trim()
+
 
         $shortenedUserInput = ($RAGAgent.ProcessInput($RAGUserPrompt, $RAGSystemPrompt)).trim()
 
@@ -2263,7 +2363,7 @@ function Get-OllamaModels {
         List-OllamaModels
 
     .NOTES
-        Author: YourName
+        Author: voytas75
         Date: 2024.07.10
     #>
     try {
@@ -2301,7 +2401,7 @@ function Start-OllamaInNewConsole {
         Start-OllamaInNewConsole
 
     .NOTES
-        Author: YourName
+        Author: voytas75
         Date: 2024.07.10
     #>
     # Check if Ollama is installed
@@ -2479,7 +2579,7 @@ function Test-OllamaInstalled {
         Returns $true if Ollama is installed, otherwise $false.
 
     .NOTES
-        Author: YourName
+        Author: voytas75
         Date: 2024.07.10
     #>
     param ()
@@ -2515,7 +2615,7 @@ function Test-OllamaAPI {
         Returns $true if the Ollama API is accessible, otherwise $false.
 
     .NOTES
-        Author: YourName
+        Author: voytas75
         Date: 2024.07.10
     #>
     param (
@@ -2553,7 +2653,7 @@ function Test-OllamaRunning {
         Returns $true if the Ollama process is running, otherwise $false.
 
     .NOTES
-        Author: YourName
+        Author: voytas75
         Date: 2024.07.10
     #>
     param ()
@@ -2637,6 +2737,7 @@ $GlobalState = [PSCustomObject]@{
     NOPM                     = $NOPM
     RAG                      = $RAG
     Stream                   = $Stream
+    LLMProvider              = $LLMProvider
 }
 $GlobalState.LogFolder = $LogFolder
 
@@ -2646,8 +2747,10 @@ $env:PSAOAI_BANNER = "0"
 
 # Check if the UserInput parameter is not provided
 if (-not $UserInput) {
-    # Prompt the user to enter the PowerShell project description
-    $UserInput = Read-Host "Please enter the PowerShell project description"
+    if (-not $LoadProjectStatus) {
+        # Prompt the user to enter the PowerShell project description
+        $UserInput = Read-Host "Please enter the PowerShell project description"
+    }
     # Store the user input in the GlobalState object
     $GlobalState.UserInput = $UserInput
 }
@@ -2655,7 +2758,7 @@ if (-not $UserInput) {
 Show-Banner
 
 #region ollama
-if ($LLMProvider -eq 'ollama') {
+if ($GlobalState.LLMProvider -eq 'ollama') {
     $script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
@@ -2745,7 +2848,7 @@ if ($LLMProvider -eq 'ollama') {
 
 #region LMStudio
 # Check if the LLM provider is 'lmstudio'
-if ($LLMProvider -eq 'lmstudio') {
+if ($GlobalState.LLMProvider -eq 'lmstudio') {
     # Retrieve the LM Studio API key from the environment variables
     $script:lmstudioApiKey = [System.Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'user')
     # Retrieve the LM Studio API base URL from the environment variables
@@ -2768,10 +2871,10 @@ if ($LLMProvider -eq 'lmstudio') {
         Write-Verbose "++ Default LM Studio API base set to 'http://localhost:1234/v1'"
     }
 
-        # Ensure the LMStudio endpoint ends with a '/'
-        if (-not $script:lmstudioApiBase.EndsWith('/')) {
-            $script:lmstudioApiBase += '/'
-        }
+    # Ensure the LMStudio endpoint ends with a '/'
+    if (-not $script:lmstudioApiBase.EndsWith('/')) {
+        $script:lmstudioApiBase += '/'
+    }
 
     try {
         $LMStudioServerResponse = Invoke-WebRequest -Uri $script:lmstudioApiBase
@@ -2856,10 +2959,13 @@ if ($LoadProjectStatus) {
         Write-Verbose "`$GlobalState.NOPM: $($GlobalState.NOPM)"
         Write-Verbose "`$GlobalState.RAG: $($GlobalState.RAG)"
         Write-Verbose "`$GlobalState.Stream: $($GlobalState.Stream)"
+        Write-Verbose "`$GlobalState.LLMProvider: $($GlobalState.LLMProvider)"
     }    
     catch [System.Exception] {
         # Handle any exceptions that occur during the loading of the project state
-        Update-ErrorHandling -ErrorRecord $_ -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        #Update-ErrorHandling -ErrorRecord $_ -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        Update-ErrorHandling -ErrorRecord $_ -LogFilePath (Join-Path (split-path -Path $LoadProjectStatus -Parent) "ERROR.txt")
+        
     }
 }
 else {
@@ -3284,7 +3390,7 @@ $Team += $documentationSpecialist
 $Team += $projectManager
 
 foreach ($TeamMember in $Team) {
-    $TeamMember.LLMProvider = $LLMProvider
+    $TeamMember.LLMProvider = $GlobalState.LLMProvider
 }
 
 if ($GlobalState.NOLog) {
@@ -3303,7 +3409,7 @@ if (-not $GlobalState.NOLog) {
 
 $RAGpromptAddon = $null
 if ($GlobalState.RAG) {
-    $RAGSummarizePrompt =@"
+    $RAGSummarizePrompt = @"
 You are an expert in Retrieval-Augmented Generation (RAG) and text analysis. Your role is to process and analyze text inputs, extracting key information relevant to a given context. Your tasks include:
 
 1. Cleaning the input text by removing advertising elements, menus, and other non-essential content.
