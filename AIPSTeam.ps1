@@ -1444,6 +1444,22 @@ function Save-ProjectState {
         [PSCustomObject] $GlobalState  # Global state object containing project details
     )
     try {
+        # Export the project state to a file in XML format
+        $GlobalState | Export-Clixml -Path $FilePath
+    }    
+    catch [System.Exception] {
+        # Handle any exceptions that occur during the save process
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+    }
+}
+
+function Save-ProjectState_old2 {
+    param (
+        [string]$FilePath, # Path to save the project state
+        [PSCustomObject] $GlobalState  # Global state object containing project details
+    )
+    try {
         # Create a hashtable to store the project state dynamically
         $projectState = @{}
         $GlobalState | Get-Member -MemberType Properties | ForEach-Object {
@@ -1506,15 +1522,38 @@ function Get-ProjectState {
         if (Test-Path -Path $FilePath) {
             # Import the project state from the XML file
             $projectState = Import-Clixml -Path $FilePath
+            if ($null -eq $projectState.LLMProvider) {
+                $projectState.LLMProvider = "AzureOpenAI"
+            }
+            # Return the updated GlobalState object
+            return $projectState
+        }
+        else {
+            # Inform the user that the project state file was not found
+            Write-Host "-- Project state file not found."
+        }
+    }    
+    catch [System.Exception] {
+        # Handle any exceptions that occur during the process
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path (split-path -Path $FilePath -Parent) "ERROR.txt")  
+    }
+}
+
+function Get-ProjectState_old {
+    param (
+        [string]$FilePath
+    )
+    try {
+        # Check if the specified file path exists
+        if (Test-Path -Path $FilePath) {
+            # Import the project state from the XML file
+            $projectState = Import-Clixml -Path $FilePath
             
-            # Dynamically update the GlobalState object with the imported project state values
+            # Get keys and values from projectState and create GlobalState
+            $GlobalState = [PSCustomObject]@{}
             $projectState.PSObject.Properties | ForEach-Object {
-                if ($GlobalState.PSObject.Properties["$($_.Name)"].IsReadOnly -eq $false) {
-                    $GlobalState."$($_.Name)" = $_.Value
-                }
-                else {
-                    Write-Warning "The property '$($_.Name)' is read-only and cannot be set."
-                }
+                $GlobalState | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Value
             }
             
             # Return the updated GlobalState object
@@ -2719,27 +2758,29 @@ if ($NORAG) {
     $RAG = $false
 }
 
-# Define a state management object
-$GlobalState = [PSCustomObject]@{
-    TeamDiscussionDataFolder = $null
-    GlobalResponse           = @()
-    FileVersion              = 1
-    LastPSDevCode            = ""
-    GlobalPSDevResponse      = @()
-    OrgUserInput             = ""
-    UserInput                = ""
-    LogFolder                = ""
-    MaxTokens                = $MaxTokens
-    VerbosePrompt            = $VerbosePrompt
-    NOTips                   = $NOTips
-    NOLog                    = $NOLog
-    NODocumentator           = $NODocumentator
-    NOPM                     = $NOPM
-    RAG                      = $RAG
-    Stream                   = $Stream
-    LLMProvider              = $LLMProvider
+if (-not $LoadProjectStatus) {
+    # Define a state management object
+    $GlobalState = [PSCustomObject]@{
+        TeamDiscussionDataFolder = $null
+        GlobalResponse           = @()
+        FileVersion              = 1
+        LastPSDevCode            = ""
+        GlobalPSDevResponse      = @()
+        OrgUserInput             = ""
+        UserInput                = ""
+        LogFolder                = ""
+        MaxTokens                = $MaxTokens
+        VerbosePrompt            = $VerbosePrompt
+        NOTips                   = $NOTips
+        NOLog                    = $NOLog
+        NODocumentator           = $NODocumentator
+        NOPM                     = $NOPM
+        RAG                      = $RAG
+        Stream                   = $Stream
+        LLMProvider              = $LLMProvider
+    }
+    $GlobalState.LogFolder = $LogFolder
 }
-$GlobalState.LogFolder = $LogFolder
 
 # Disabe PSAOAI importing banner
 [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
@@ -2750,15 +2791,15 @@ if (-not $UserInput) {
     if (-not $LoadProjectStatus) {
         # Prompt the user to enter the PowerShell project description
         $UserInput = Read-Host "Please enter the PowerShell project description"
+        # Store the user input in the GlobalState object
+        $GlobalState.UserInput = $UserInput
     }
-    # Store the user input in the GlobalState object
-    $GlobalState.UserInput = $UserInput
 }
 
 Show-Banner
 
 #region ollama
-if ($GlobalState.LLMProvider -eq 'ollama') {
+if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
     $script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
@@ -2848,7 +2889,7 @@ if ($GlobalState.LLMProvider -eq 'ollama') {
 
 #region LMStudio
 # Check if the LLM provider is 'lmstudio'
-if ($GlobalState.LLMProvider -eq 'lmstudio') {
+if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
     # Retrieve the LM Studio API key from the environment variables
     $script:lmstudioApiKey = [System.Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'user')
     # Retrieve the LM Studio API base URL from the environment variables
@@ -2960,6 +3001,19 @@ if ($LoadProjectStatus) {
         Write-Verbose "`$GlobalState.RAG: $($GlobalState.RAG)"
         Write-Verbose "`$GlobalState.Stream: $($GlobalState.Stream)"
         Write-Verbose "`$GlobalState.LLMProvider: $($GlobalState.LLMProvider)"
+
+        Write-Host "Some values of the imported project:"
+        Write-Host "Team Discussion Data Folder: $($GlobalState.TeamDiscussionDataFolder)"
+        Write-Host "Last file Version: $($($GlobalState.FileVersion) - 1)"
+        Write-Host "User Input: $($GlobalState.OrgUserInput)"
+        Write-Host "Log Folder: $($GlobalState.LogFolder)"
+        Write-Host "No Tips: $($GlobalState.NOTips)"
+        Write-Host "No Log: $($GlobalState.NOLog)"
+        Write-Host "No Documentator: $($GlobalState.NODocumentator)"
+        Write-Host "No Project Manager: $($GlobalState.NOPM)"
+        Write-Host "RAG: $($GlobalState.RAG)"
+        Write-Host "Stream: $($GlobalState.Stream)"
+        Write-Host "LLM Provider: $($GlobalState.LLMProvider)"
     }    
     catch [System.Exception] {
         # Handle any exceptions that occur during the loading of the project state
@@ -2999,9 +3053,16 @@ else {
         return $false
     }
 }
-$DocumentationFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "Documentation.txt"
-$ProjectfilePath = Join-Path $GlobalState.TeamDiscussionDataFolder "Project.xml"
-Get-CheckForScriptUpdate -currentScriptVersion $AIPSTeamVersion -scriptName $scriptname
+try {
+    $DocumentationFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "Documentation.txt" -ErrorAction Stop
+    $ProjectfilePath = Join-Path $GlobalState.TeamDiscussionDataFolder "Project.xml" -ErrorAction Stop
+    Get-CheckForScriptUpdate -currentScriptVersion $AIPSTeamVersion -scriptName $scriptname
+}
+catch [System.Exception] {
+    # Handle any exceptions that occur during the path joining or script update check
+    Update-ErrorHandling -ErrorRecord $_ -ErrorContext "Setting up documentation and project file paths or checking for script update" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+    return $false
+}
 #endregion Setting Up
 
 #region ProjectTeam
@@ -3408,7 +3469,7 @@ if (-not $GlobalState.NOLog) {
 }
 
 $RAGpromptAddon = $null
-if ($GlobalState.RAG) {
+if ($GlobalState.RAG -and (-not $LoadProjectStatus)) {
     $RAGSummarizePrompt = @"
 You are an expert in Retrieval-Augmented Generation (RAG) and text analysis. Your role is to process and analyze text inputs, extracting key information relevant to a given context. Your tasks include:
 
