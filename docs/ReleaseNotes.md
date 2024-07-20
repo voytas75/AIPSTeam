@@ -4,9 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.5.2] - unpublished
+## [3.5.2] - 2024.07.20
 
 - add secret agent to clean RAG data.
+- fixed load project logic ([#9](https://github.com/voytas75/AIPSTeam/issues/9)).
 - minor fixes.
 
 ## [3.5.1] - 2024.07.15
