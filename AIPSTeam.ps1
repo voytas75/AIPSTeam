@@ -3607,7 +3607,7 @@ $($($GlobalState.userInput).trim())
     if (-not $GlobalState.NOPM) {
         # Example of summarizing all steps,  Log final response to file
         if (-not $GlobalState.NOLog) {
-            $projectManagerPrompt = "Generate project report without the PowerShell code.`n"
+            $projectManagerPrompt = "Generate project report without showing the PowerShell code.`n"
             $projectManagerPrompt += $GlobalState.GlobalResponse -join ", "
             $projectManagerResponse = $projectManager.ProcessInput($projectManagerPrompt) 
             $projectManagerResponse | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
