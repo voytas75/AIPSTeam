@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [3.5.3] - unpublished
 
-- 
+- optimize queries and prompts.
+- add stream to RAG.
+- minor fixes.
 
 ## [3.5.2] - 2024.07.20
 
