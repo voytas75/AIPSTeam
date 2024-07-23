@@ -1642,6 +1642,9 @@ function Update-ErrorHandling {
         "(403)" {
             "I recommend checking your API key, permissions, and any other relevant settings. You might also want to consult the Azure documentation or seek assistance from the Azure support team."
         }
+        '(429)' {
+            "Too many requests have been made to the server in a short period. Implement rate limiting or exponential backoff in your requests. Consider reviewing the API's rate limit guidelines and ensure your application adheres to them."
+        }
         default {
             "Refer to the error message and stack trace for more details. Consult the official documentation or seek help from the community."
         }
@@ -1820,7 +1823,7 @@ function Invoke-AIPSTeamOllamaCompletion {
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
     }
-    
+    Write-Verbose $ollamaJson
     # Define the URL for the Ollama API endpoint
     $url = "$($script:ollamaEndpoint)api/generate"
 
@@ -1926,24 +1929,24 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         "Content-Type"  = "application/json"
         "Authorization" = "Bearer '$ApiKey'"
     }
-    $bodyJSON = [pscustomobject]@{
+    $bodyJSON = [ordered]@{
         'model'       = $Model
         'messages'    = @(
-            @{
+            [ordered]@{
                 'role'    = 'system'
                 'content' = $SystemPrompt
             },
-            @{
+            [ordered]@{
                 'role'    = 'user'
                 'content' = $UserPrompt
             }
         )
         'temperature' = $Temperature
         'top_p'       = $TopP
-        'stream'      = $stream
-        'max_tokens'  = 4096
+        'stream'      = $Stream
+        'max_tokens'  = $GlobalState.maxtokens
     } | ConvertTo-Json
-
+    Write-Verbose $bodyJSON
     # Call lm-studio
     #if ($modelResponse.data.Count -ne 0) {
     $InfoText = "++ LM Studio" + $(if ($Model) { " ($Model)" } else { "" }) + " is working..."
@@ -1994,7 +1997,7 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         $completeText = ""
         while ($null -ne ($line = $reader.ReadLine()) -or (-not $reader.EndOfStream)) {
             # Check if the line starts with "data: " and is not "data: [DONE]"
-            Write-Verbose $line
+            #Write-Verbose $line
             if ($line.StartsWith("data: ") -and $line -ne "data: [DONE]") {
                 # Extract the JSON part from the line
                 $jsonPart = $line.Substring(6)    
@@ -2191,35 +2194,85 @@ function Remove-StringDirtyData {
     
     # Define the LLM system prompt for cleaning the string
     $LLMSystemPrompt = @"
-You are an expert text processor specializing in cleaning and formatting web content. Your task is to process text that originally came from HTML but has already had its HTML tags removed. The text may still contain artifacts, irregular spacing, or formatting issues from the HTML removal process. Your goal is to produce clean, readable text.
+You are an expert text processor specializing in cleaning and formatting web content. Your task is to process text that originally came from HTML but has already had its HTML tags removed. The text still contains artifacts, irregular spacing, meta content, sidebar content or formatting issues from the HTML removal process. Your goal is to produce clean, readable text.
+
+In your processing you must:
+
+1. Remove all HTML entities (e.g., &nbsp;, &amp;, &#39;) and replace them with their corresponding characters. Use a comprehensive list of HTML entities for reference.
+
+2. Normalize line breaks:
+   - Reduce multiple consecutive blank lines to a single blank line for paragraph separation.
+   - Preserve intentional line breaks for structured content like addresses, poetry, or code snippets.
+   - Remove unnecessary line breaks within paragraphs, joining split sentences.
+
+3. Clean up HTML artifacts:
+   - Remove any remaining HTML tags, including partial or malformed tags.
+   - Eliminate stray brackets, braces, or other syntax-related characters that don't belong in plain text.
+
+4. Standardize spacing:
+   - Ensure single spaces after punctuation marks (periods, commas, colons, etc.).
+   - Remove extra spaces between words.
+   - Eliminate leading or trailing spaces on each line.
+
+5. Normalize quotation marks and apostrophes:
+   - Use straight quotes (' and ") consistently throughout the text.
+   - Ensure apostrophes are used correctly for contractions and possessives.
+
+6. Correct capitalization:
+   - Capitalize the first letter of each sentence.
+   - Preserve intentional capitalization for proper nouns, acronyms, and titles.
+
+7. Remove redundancies:
+   - Eliminate repeated words or phrases that likely resulted from improper tag removal or formatting issues.
+   - Be cautious not to remove intentional repetition for emphasis or stylistic purposes.
+
+8. Format lists consistently:
+   - Identify and standardize bulleted and numbered lists.
+   - Ensure consistent indentation and formatting for list items.
+   - Convert HTML list structures to plain text equivalents if necessary.
+
+9. Correct spelling and encoding errors:
+   - Fix obvious spelling mistakes, especially those resulting from character encoding issues.
+   - Be cautious with proper nouns or specialized terminology.
+
+10. Standardize punctuation:
+    - Use consistent em-dashes, en-dashes, and hyphens.
+    - Ensure correct usage of semicolons, colons, and other punctuation marks.
+
+11. Preserve or convert special formatting:
+    - Maintain emphasis (bold, italic) using plain text conventions (e.g., *asterisks* or _underscores_) if appropriate for the output format.
+    - Convert simple tables to a readable plain text format if encountered.
+
+12. Handle URLs and email addresses:
+    - Ensure hyperlinks are visible and properly formatted in plain text.
+    - Preserve the integrity of email addresses and web URLs.
+
+13. Normalize number and date formats:
+    - Standardize numerical representations (e.g., consistent use of commas or periods for thousands separators).
+    - Use a consistent date format throughout the document.
+
+14. Remove or replace non-printable characters:
+    - Eliminate null characters, form feeds, and other control characters.
+    - Replace tabs with appropriate spacing.
+
+15. Final consistency check:
+    - Ensure overall consistency in formatting choices throughout the document.
+    - Verify that the cleaning process hasn't introduced new errors or inconsistencies.
 "@
 
     # Define the user prompt with the input string
     $LLMUserPrompt = @"
-Please process the following text:
+Web content:
 
-``````
+``````text
 $cleanedString
 ``````
 
-In your processing:
-
-1. Remove any remaining HTML entities (e.g., &nbsp;, &amp;, &#39;) and replace them with their appropriate characters.
-2. Eliminate excessive blank lines, reducing multiple consecutive blank lines to a single blank line for paragraph separation.
-3. Remove any lingering HTML-related artifacts that don't make sense in plain text (e.g., stray brackets, incomplete tags).
-4. Correct obvious spacing issues, ensuring there's a space after punctuation marks and between words.
-5. Standardize quotation marks and apostrophes (use straight quotes ' and " instead of curly quotes).
-6. Ensure proper capitalization at the beginning of sentences.
-7. Remove any repeated words that might have resulted from improper tag removal.
-8. Preserve intentional line breaks for items like addresses or poetry, but remove unnecessary line breaks within paragraphs.
-9. If you encounter any lists, ensure they are formatted consistently with appropriate indentation or numbering.
-10. Correct any obvious spelling errors that may have resulted from improper character encoding.
-
-Present the cleaned text, maintaining its original structure and meaning as much as possible. If you make any significant changes or corrections, briefly explain your reasoning at the end of the processed text.
+Present the cleaned text only, maintaining its original structure and meaning as much as possible.
 "@
 
     # Invoke the LLM to clean the string
-    $cleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider -SystemPrompt $LLMSystemPrompt -UserPrompt $LLMUserPrompt -Temperature 0.7 -TopP 0.9 -MaxTokens 20500 -Stream $false -LogFolder $GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+    $cleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider -SystemPrompt $LLMSystemPrompt -UserPrompt $LLMUserPrompt -Temperature 0.7 -TopP 0.9 -MaxTokens 20500 -Stream $GlobalState.maxtokens -LogFolder $GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
     
     return $cleanedString
 }
@@ -2250,11 +2303,12 @@ Examples of well-formed queries:
 - 'Powershell code AND psscriptanalyzer'
 - 'Powershell AND azure data logger AND event log'
 
-Respond with the optimized query only.
+You must respond with the optimized query only ready to be invoked in search engine.
 "@
 
+        #Create an optimized web search query based on the following text:
         $RAGUserPrompt = @"
-Create an optimized web search query based on the following text:
+User input:
 ````````text
 $($userInput.trim())
 ````````
@@ -2296,7 +2350,7 @@ $($userInput.trim())
             # Process the cleaned web results text with the project manager's input processing function
             $RAGuserinput = @"
 
-Please analyze the following text through the lens of this description: "$userinput"
+Please analyze the following text through the lens of this description: '$userinput'
 
 Text to analyze:
 ````````text

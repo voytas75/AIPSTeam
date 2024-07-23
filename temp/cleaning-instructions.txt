@@ -1,0 +1,10 @@
+1. Remove any remaining HTML entities (e.g., &nbsp;, &amp;, &#39;) and replace them with their appropriate characters.
+2. Eliminate excessive blank lines, reducing multiple consecutive blank lines to a single blank line for paragraph separation.
+3. Remove any lingering HTML-related artifacts that don't make sense in plain text (e.g., stray brackets, incomplete tags).
+4. Correct obvious spacing issues, ensuring there's a space after punctuation marks and between words.
+5. Standardize quotation marks and apostrophes (use straight quotes ' and " instead of curly quotes).
+6. Ensure proper capitalization at the beginning of sentences.
+7. Remove any repeated words that might have resulted from improper tag removal.
+8. Preserve intentional line breaks for items like addresses or poetry, but remove unnecessary line breaks within paragraphs.
+9. If you encounter any lists, ensure they are formatted consistently with appropriate indentation or numbering.
+10. Correct any obvious spelling errors that may have resulted from improper character encoding.
