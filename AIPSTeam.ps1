@@ -21,7 +21,7 @@ Emulates a team of AI-powered Agents with RAG collaborating on a PowerShell proj
 This script simulates a team of AI-powered Agents with RAG, each with a unique role in executing a project. User input is processed by one AI specialist, who performs their task and passes the result to the next AI Agent. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
 
 .PARAMETER userInput 
-Defines the project outline as a string. The default is to monitor RAM usage and show a color block based on the load. This parameter can also accept input from the pipeline.
+Defines the project outline as a string. This parameter can also accept input from the pipeline.
 
 .PARAMETER Stream 
 Controls whether the output should be streamed live. The default is `$true`.
