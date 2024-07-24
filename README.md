@@ -336,6 +336,7 @@ Ensure these environment variables are set before running the script to enable t
 - **Modules**:
   - `PSAOAI`
   - `PSScriptAnalyzer`
+  - `PowerHTML`
 
 ## Use Cases and Expected Outputs
 
