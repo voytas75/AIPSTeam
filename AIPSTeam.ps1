@@ -2300,10 +2300,30 @@ Present the cleaned text only, maintaining its original structure and meaning as
 "@
 
     # Invoke the LLM to clean the string
-    $cleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider -SystemPrompt $LLMSystemPrompt -UserPrompt $LLMUserPrompt -Temperature 0.7 -TopP 0.9 -MaxTokens 20500     -Stream $false -LogFolder $GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
-    Write-Host "++ Cleaning RAG Raw Data: Finished." -ForegroundColor Cyan
+    try {
+        Write-Verbose "Invoking LLM to clean the string."
 
-    return $cleanedString
+        # Invoke the LLMChatCompletion function with the necessary parameters
+        $CleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider `
+            -SystemPrompt $LLMSystemPrompt `
+            -UserPrompt $LLMUserPrompt `
+            -Temperature 0.7 `
+            -TopP 0.9 `
+            -MaxTokens $GlobalState.MaxTokens `
+            -Stream $false `
+            -LogFolder $GlobalState.TeamDiscussionDataFolder `
+            -DeploymentChat $script.DeploymentChat `
+            -ollamaModel $script.ollamaModel
+
+        Write-Host "++ Cleaning RAG Raw Data: Finished." -ForegroundColor Cyan
+        return $CleanedString
+    }
+    catch {
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        Write-Host "-- An error occurred while invoking the LLM to clean the string." -ForegroundColor DarkYellow
+        return
+    }
 }
 
 function Invoke-RAG {

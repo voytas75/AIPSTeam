@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - optimize queries and prompts.
 - add information message after cleaning RAG data.
 - add verbose messages.
-- minor fixes.
+- minor fixes, code formatting.
 
 ## [3.5.2] - 2024.07.20
 
