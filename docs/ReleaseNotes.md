@@ -4,10 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.5.3] - unpublished
+## [3.6.1] - unpublished
 
 - optimize queries and prompts.
-- add stream to RAG.
+- add information message after cleaning RAG data.
+- add verbose messages.
 - minor fixes.
 
 ## [3.5.2] - 2024.07.20

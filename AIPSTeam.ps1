@@ -71,7 +71,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.5.3
+Version: 3.6.1
 Author: voytas75
 Creation Date: 05.2024
 
@@ -121,7 +121,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.5.3"
+$AIPSTeamVersion = "3.6.1"
 
 #region ProjectTeamClass
 <#
@@ -1767,26 +1767,30 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         Write-Verbose "LogFolder: $LogFolder"
         Write-Verbose "Deployment: $Deployment"
 
-
         # Call Azure OpenAI API
-        Write-Host "++ AZURE OpenaAI ($Deployment) is working..."
+        Write-Host "++ AZURE OpenAI ($Deployment) is working..."
         if ($Stream) {
             Write-Host "++ Streaming" -ForegroundColor Blue
         }
-        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt 
+
+        # Invoke the Azure OpenAI chat completion function
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
         }
 
         # Check if the response is null or empty
-        #if ([string]::IsNullOrEmpty($response)) {
-        #    throw "The response from Azure OpenAI API is null or empty."
-        #}
+        if ([string]::IsNullOrEmpty($response)) {
+            $errorMessage = "The response from Azure OpenAI API is null or empty."
+            Write-Error $errorMessage
+            throw $errorMessage
+        }
 
         return $response
     }
     catch {
-        # Log the error and rethrow it
+        # Log the error and rethrow it with additional context
         $functionName = $MyInvocation.MyCommand.Name
         $errorMessage = "Error in ${functionName}: $_"
         Write-Error $errorMessage
@@ -2061,10 +2065,10 @@ function Invoke-BingWebSearch {
         [string]$query, # The search query
 
         [Parameter(Mandatory = $false)]
-        [string]$apiKey = [System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User"), # The API key for Bing Search API
+        [string]$apiKey,
         
         [Parameter(Mandatory = $false)]
-        [string]$endpoint = [System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"), # The endpoint for Bing Search API
+        [string]$endpoint,
         
         [Parameter(Mandatory = $false)]
         [string]$language = "en-US", # The language for the search results
@@ -2072,15 +2076,22 @@ function Invoke-BingWebSearch {
         [Parameter(Mandatory = $false)]
         [int]$count  # The number of search results to return
     )
-    
-    # Loop until a valid API key is provided
-    while (-not $apiKey) {
-        # Prompt the user to enter their Azure Bing API key
+
+    # Ensure the API key is provided, prompt the user if not
+    while ([string]::IsNullOrEmpty($apiKey) -or [string]::IsNullOrWhiteSpace($apiKey)) {
         $apiKey = Read-Host -Prompt "Please enter your AZURE Bing API key"
-            
-        # If the user provides an API key, save it as an environment variable
         if ($apiKey) {
             [System.Environment]::SetEnvironmentVariable("AZURE_BING_API_KEY", $apiKey, "User")
+            Write-Verbose "API key set successfully."
+        }
+    }
+
+    # Ensure the endpoint is provided, prompt the user if not
+    while ([string]::IsNullOrEmpty($endpoint) -or [string]::IsNullOrWhiteSpace($endpoint)) {
+        $endpoint = Read-Host -Prompt "Please enter the AZURE Bing Web Search Endpoint"
+        if ($endpoint) {
+            [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $endpoint, "User")
+            Write-Verbose "Endpoint set successfully."
         }
     }
     
@@ -2089,12 +2100,14 @@ function Invoke-BingWebSearch {
         "Ocp-Apim-Subscription-Key" = $apiKey
         "Pragma"                    = "no-cache"
     }
+    Write-Verbose "Headers defined for the API request."
 
-    # If the query length is greater than 50 characters, truncate it to 50 characters
+    # If the query length is greater than the maximum allowed, truncate it
     $maxqueryLength = 120
     if ($query.Length -gt $maxqueryLength) {
         Write-Host "Query length is greater than $maxqueryLength characters. Truncating the query."
         $query = $query.Substring(0, $maxqueryLength)
+        Write-Verbose "Query truncated to $maxqueryLength characters."
     }
     
     # Define the parameters for the API request
@@ -2103,25 +2116,31 @@ function Invoke-BingWebSearch {
         "mkt"   = $language
         "count" = $count
     }
+    Write-Verbose "Parameters defined for the API request."
 
-    # Perform a web search using Bing with the user input and limit the results to 2
+    # Ensure the endpoint is provided, prompt the user if not
     while ([string]::IsNullOrEmpty($Endpoint)) {
         $Endpoint = Read-Host -Prompt "Please enter the AZURE Bing Web Search Endpoint"
     }
     [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $Endpoint, "User")
     $endpoint += "v7.0/search"
+    Write-Verbose "Final endpoint set to $endpoint."
         
     # Disable the Expect100Continue behavior to avoid delays in sending data
     [System.Net.ServicePointManager]::Expect100Continue = $false
+    Write-Verbose "Expect100Continue behavior disabled."
     
     # Disable the Nagle algorithm to improve performance for small data packets
     [System.Net.ServicePointManager]::UseNagleAlgorithm = $false
+    Write-Verbose "Nagle algorithm disabled."
     
     # Set the security protocol to TLS 1.2 for secure communication
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+    Write-Verbose "Security protocol set to TLS 1.2."
     
     try {
         # Make the API request to Bing Search
+        Write-Verbose "Making API request to Bing Search."
         $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -Body $params
 
         # Check if the response contains web pages
@@ -2130,13 +2149,13 @@ function Invoke-BingWebSearch {
             return $null
         }
 
+        Write-Verbose "API request successful. Returning search results."
         # Return the search results
         return $response.webPages.value
     }
     catch [System.Net.WebException] {
         # Handle web exceptions (e.g., network issues)
         Write-Warning "Network error occurred during Bing search: $_"
-        #return $null
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
         Throw $_
@@ -2144,7 +2163,6 @@ function Invoke-BingWebSearch {
     catch [System.Exception] {
         # Handle all other exceptions
         Write-Warning "An error occurred during Bing search: $_"
-        #return $null
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
         Throw $_
@@ -2156,28 +2174,38 @@ function Remove-StringDirtyData {
         [string]$inputString
     )
 
+    Write-Verbose "Starting to clean the input string."
+
     # Remove leading and trailing whitespace
+    Write-Verbose "Removing leading and trailing whitespace."
     $cleanedString = $inputString.Trim()
 
     # Remove multiple spaces and replace with a single space
+    Write-Verbose "Replacing multiple spaces with a single space."
     $cleanedString = $cleanedString -replace '\s+', ' '
 
     # Remove any non-printable characters
+    Write-Verbose "Removing non-printable characters."
     $cleanedString = $cleanedString -replace '[^\x20-\x7E]', ''
 
     # Remove &nbsp; entities
+    Write-Verbose "Removing &nbsp; entities."
     $cleanedString = $cleanedString -replace '&nbsp;', ' '
 
     # Remove empty lines
+    Write-Verbose "Removing empty lines."
     $cleanedString = $cleanedString -replace '^\s*$\n', ''
 
     # Convert the string to an array of lines
+    Write-Verbose "Converting the string to an array of lines."
     $lines = $cleanedString -split "`n"
 
     # Remove empty lines
+    Write-Verbose "Removing empty lines from the array of lines."
     $lines = $lines | Where-Object { $_.Trim() -ne "" }
 
     # Join the lines back into a single string
+    Write-Verbose "Joining the lines back into a single string."
     $cleanedString = $lines -join "`n"
 
     #region Cleaning RAG Raw Data
@@ -2272,23 +2300,25 @@ Present the cleaned text only, maintaining its original structure and meaning as
 "@
 
     # Invoke the LLM to clean the string
-    $cleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider -SystemPrompt $LLMSystemPrompt -UserPrompt $LLMUserPrompt -Temperature 0.7 -TopP 0.9 -MaxTokens 20500 -Stream $GlobalState.maxtokens -LogFolder $GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
-    
+    $cleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider -SystemPrompt $LLMSystemPrompt -UserPrompt $LLMUserPrompt -Temperature 0.7 -TopP 0.9 -MaxTokens 20500     -Stream $false -LogFolder $GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+    Write-Host "++ Cleaning RAG Raw Data: Finished." -ForegroundColor Cyan
+
     return $cleanedString
 }
 
-
 function Invoke-RAG {
     param (
-        [string]$userInput,
-        [string]$prompt,
+        [string]$UserInput,
+        [string]$Prompt,
         [ProjectTeam]$RAGAgent,
         [int]$MaxCount = 2
     )
-    $RAGresponse = $null
-    $shortenedUserInput = ""
+    $RAGResponse = $null
+    $ShortenedUserInput = ""
     try {
+        Write-Verbose "Starting Invoke-RAG function."
 
+        # Define the system prompt for the RAG agent
         $RAGSystemPrompt = @"
 You are a Web Search Query Manager. Your task is to suggest the best query for the Azure Bing Web Search API based on the user's input. To create an effective query, summarize the given text and follow these best practices:
 
@@ -2306,7 +2336,9 @@ Examples of well-formed queries:
 You must respond with the optimized query only ready to be invoked in search engine.
 "@
 
-        #Create an optimized web search query based on the following text:
+        Write-Verbose "RAG system prompt defined."
+
+        # Create an optimized web search query based on the following text
         $RAGUserPrompt = @"
 User input:
 ````````text
@@ -2314,41 +2346,68 @@ $($userInput.trim())
 ````````
 "@
 
+        # Process the user input with the RAG agent and trim the result
+        $ShortenedUserInput = ($RAGAgent.ProcessInput($RAGUserPrompt, $RAGSystemPrompt)).trim()
 
-        $shortenedUserInput = ($RAGAgent.ProcessInput($RAGUserPrompt, $RAGSystemPrompt)).trim()
+        Write-Verbose "RAG agent processed the input and returned a shortened user input."
 
         Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
 
         # Check if the shortened user input is not empty
-        if (-not [string]::IsNullOrEmpty($shortenedUserInput)) {
-            # Define the log file path for storing the query
-            $logFilePath = Join-Path -Path $GlobalState.TeamDiscussionDataFolder -ChildPath "azurebingqueries.log"
-            # Append the shortened user input to the log file with a date prefix in professional log style
-            $datePrefix = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-            $logEntry = "$datePrefix - Query: $shortenedUserInput"
-            Add-Content -Path $logFilePath -Value $logEntry
+        if (-not [string]::IsNullOrEmpty($ShortenedUserInput)) {
+            Write-Verbose "Shortened user input is not empty. Proceeding with web search."
 
-            # Perform the web search using the shortened user input
-            $webResults = Invoke-BingWebSearch -query $shortenedUserInput -count $MaxCount
+            try {
+                # Define the log file path for storing the query
+                $LogFilePath = Join-Path -Path $GlobalState.TeamDiscussionDataFolder -ChildPath "azurebingqueries.log"
+                Write-Verbose "Log file path defined: $LogFilePath"
+
+                # Append the shortened user input to the log file with a date prefix in professional log style
+                $DatePrefix = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+                $LogEntry = "$DatePrefix - Query: $ShortenedUserInput"
+                Add-Content -Path $LogFilePath -Value $LogEntry
+                Write-Verbose "Log entry added: $LogEntry"
+
+                # Perform the web search using the shortened user input
+                $WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User")) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"))
+                Write-Verbose "Web search performed with query: $ShortenedUserInput"
+            }
+            catch {
+                Write-Error "Error occurred during web search or logging: $_"
+                throw $_
+            }
         }
         else {
             # Throw an error if the query is empty
+            Write-Error "The query is empty. Unable to perform web search."
             throw "The query is empty. Unable to perform web search."
         }
 
         # Check if web results are returned
-        if ($webResults) {
-            # Extract and clean text content from the web results
-            $webResultsText = ($webResults | ForEach-Object {
-                    $htmlContent = Invoke-WebRequest -Uri $_.url
-                    $textContent = ($htmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
-                    # -replace '(?m)^\s*$', ''
-                    $textContent
-                }
-            ) -join "`n`n"
+        if ($WebResults) {
+            Write-Verbose "Web results returned. Extracting and cleaning text content."
 
-            # Process the cleaned web results text with the project manager's input processing function
-            $RAGuserinput = @"
+            try {
+                # Extract and clean text content from the web results
+                $WebResultsText = ($WebResults | ForEach-Object {
+                        $HtmlContent = Invoke-WebRequest -Uri $_.url
+                        $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
+                        $TextContent
+                    }
+                ) -join "`n`n"
+                Write-Verbose "Text content extracted and cleaned from web results."
+            }
+            catch {
+                Write-Error "Error occurred while extracting or cleaning web results: $_"
+                throw $_
+            }
+        }
+        else {
+            Write-Verbose "No web results returned."
+        }
+
+        # Process the cleaned web results text with the project manager's input processing function
+        $RAGuserinput = @"
 
 Please analyze the following text through the lens of this description: '$userinput'
 
@@ -2364,11 +2423,11 @@ Provide your analysis in the following format:
 
 Ensure your response is focused and directly related to the provided description.
 "@
-            $RAGresponse = $RAGAgent.ProcessInput($RAGuserinput, $prompt)
-            if ($RAGresponse) {
-                Write-Host "++ RAG is on. AI Agent data was successfully augmented with new data." -ForegroundColor Green
-            }
+        $RAGresponse = $RAGAgent.ProcessInput($RAGuserinput, $prompt)
+        if ($RAGresponse) {
+            Write-Host "++ RAG is on. AI Agent data was successfully augmented with new data." -ForegroundColor Green
         }
+        
         # Return the response generated by the project manager
         return $RAGresponse
     }
