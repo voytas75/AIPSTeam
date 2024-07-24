@@ -2312,8 +2312,8 @@ Present the cleaned text only, maintaining its original structure and meaning as
             -MaxTokens $GlobalState.MaxTokens `
             -Stream $false `
             -LogFolder $GlobalState.TeamDiscussionDataFolder `
-            -DeploymentChat $script.DeploymentChat `
-            -ollamaModel $script.ollamaModel
+            -DeploymentChat $script:DeploymentChat `
+            -ollamaModel $script:ollamaModel
 
         Write-Host "++ Cleaning RAG Raw Data: Finished." -ForegroundColor Cyan
         return $CleanedString
