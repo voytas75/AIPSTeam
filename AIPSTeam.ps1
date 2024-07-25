@@ -2046,7 +2046,7 @@ function Invoke-BingWebSearch {
         Write-Host "++ Status: Number of web pages found: $($response.webPages.value.Count)" -ForegroundColor Green
 
         Write-Verbose "API request successful. Returning search results."
-        
+
         # Return the search results
         return $response.webPages.value
     }
@@ -2088,6 +2088,18 @@ function Remove-StringDirtyData {
     # Remove &nbsp; entities
     Write-Verbose "Removing &nbsp; entities."
     $cleanedString = $cleanedString -replace '&nbsp;', ' '
+
+    # Remove HTML tags
+    Write-Verbose "Removing HTML tags."
+    $cleanedString = $cleanedString -replace '<[^>]*>', ''
+
+    # Decode HTML entities
+    Write-Verbose "Decoding HTML entities."
+    $cleanedString = [System.Web.HttpUtility]::HtmlDecode($cleanedString)
+ 
+    # Remove URLs (optional)
+    Write-Verbose "Removing URLs."
+    $cleanedString = $cleanedString -replace 'http[s]?://\S+', ''
 
     # Remove empty lines
     Write-Verbose "Removing empty lines."
@@ -2204,8 +2216,8 @@ Present the cleaned text only, maintaining its original structure and meaning as
         $CleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider `
             -SystemPrompt $LLMSystemPrompt `
             -UserPrompt $LLMUserPrompt `
-            -Temperature 0.7 `
-            -TopP 0.9 `
+            -Temperature 0.1 `
+            -TopP 0.1 `
             -MaxTokens $GlobalState.MaxTokens `
             -Stream $false `
             -LogFolder $GlobalState.TeamDiscussionDataFolder `
