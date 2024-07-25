@@ -4,13 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.6.1] - unpublished
+## [3.6.1] - 2024.07.25
 
-- optimize queries and prompts.
-- add information message after cleaning RAG data.
-- add verbose messages.
-- logic for missing envs of Bing Web Search.
-- minor fixes, code formatting.
+- Optimized queries and prompts for better performance.
+- Added information message after cleaning RAG data.
+- Included verbose messages for better debugging.
+- Implemented logic for handling missing environment variables in Bing Web Search.
+- Minor fixes and code formatting improvements.
+- Deleted old unused functions to clean up the codebase.
 
 ## [3.5.2] - 2024.07.20
 

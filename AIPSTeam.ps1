@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.5.3
+.VERSION 3.6.1
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -285,78 +285,88 @@ class ProjectTeam {
         }
     }
 
-    [string] ProcessInput([string] $userinput, [string] $systemprompt) {
-        Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
+[string] ProcessInput([string] $userinput, [string] $systemprompt) {
+    Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
+    
+    # Log the input
+    $this.AddLogEntry("Processing input:`n$userinput")
+    
+    # Update status
+    $this.Status = "In Progress"
+    $response = ""
+    try {
+        # Ensure ResponseMemory is initialized
+        if ($null -eq $this.ResponseMemory) {
+            $this.ResponseMemory = @()
+            $this.AddLogEntry("Initialized ResponseMemory")
+        }
         
-        # Log the input
-        $this.AddLogEntry("Processing input:`n$userinput")
+        # Initialize loop variables
+        $loopCount = 0
+        $maxLoops = 5
+        
+        # Attempt to get a response from the LLM
+        do {
+            Write-Verbose "Attempting to get a response from LLM. Loop count: $loopCount"
+            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
+            
+            if (-not [string]::IsNullOrEmpty($response)) {
+                Write-Verbose "Received a valid response from LLM."
+                break
+            }
+            
+            Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
+            Start-Sleep -Seconds 10
+            $loopCount++
+        } while ($loopCount -lt $maxLoops)
+
+        # Display the response if streaming is not enabled
+        if (-not $script:GlobalState.Stream) {
+            Write-Host $response -ForegroundColor White
+        }
+        
+        # Log the response
+        $this.AddLogEntry("Generated response:`n$response")
+        
+        # Store the response in memory with timestamp
+        $this.ResponseMemory.Add([PSCustomObject]@{
+                Response  = $response
+                Timestamp = Get-Date
+            })
+        
+        $feedbackSummary = ""
+        if ($this.FeedbackTeam.count -gt 0) {
+            # Request feedback for the response
+            Write-Verbose "Requesting feedback for the response."
+            $feedbackSummary = $this.RequestFeedback($response)
+            # Log the feedback summary
+            $this.AddLogEntry("Feedback summary:`n$feedbackSummary")
+        }
+        
+        # Integrate feedback into response
+        $responseWithFeedback = "$response`n`n$feedbackSummary"
         
         # Update status
-        $this.Status = "In Progress"
-        $response = ""
-        try {
-            # Ensure ResponseMemory is initialized
-            if ($null -eq $this.ResponseMemory) {
-                $this.ResponseMemory = @()
-                $this.AddLogEntry("Initialized ResponseMemory")
-            }
-            
-            # Use the user-provided function to get the response
-            $loopCount = 0
-            $maxLoops = 5
-            do {
-                $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
-                if (-not [string]::IsNullOrEmpty($response)) {
-                    break
-                }
-                Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
-                Start-Sleep -Seconds 10
-                $loopCount++
-            } while ($loopCount -lt $maxLoops)
-
-            if (-not $script:GlobalState.Stream) {
-                Write-Host $response -ForegroundColor White
-            }
-            
-            # Log the response
-            $this.AddLogEntry("Generated response:`n$response")
-            
-            # Store the response in memory with timestamp
-            $this.ResponseMemory.Add([PSCustomObject]@{
-                    Response  = $response
-                    Timestamp = Get-Date
-                })
-            
-            $feedbackSummary = ""
-            if ($this.FeedbackTeam.count -gt 0) {
-                # Request feedback for the response
-                $feedbackSummary = $this.RequestFeedback($response)
-                # Log the feedback summary
-                $this.AddLogEntry("Feedback summary:`n$feedbackSummary")
-            }
-            
-            # Integrate feedback into response
-            $responseWithFeedback = "$response`n`n$feedbackSummary"
-            
-            # Update status
-            $this.Status = "Completed"
-        }
-        catch {
-            # Log the error
-            $this.AddLogEntry("Error:`n$_")
-            # Update status
-            $this.Status = "Error"
-            throw $_
-        }
-
-        # Pass to the next expert if available
-        if ($null -ne $this.NextExpert) {
-            return $this.NextExpert.ProcessInput($responseWithFeedback)
-        }
-        else {
-            return $responseWithFeedback
-        }
+        $this.Status = "Completed"
     }
+    catch {
+        # Log the error
+        $this.AddLogEntry("Error:`n$_")
+        # Update status
+        $this.Status = "Error"
+        throw $_
+    }
+
+    # Pass to the next expert if available
+    if ($null -ne $this.NextExpert) {
+        Write-Verbose "Passing response to the next expert."
+        return $this.NextExpert.ProcessInput($responseWithFeedback)
+    }
+    else {
+        Write-Verbose "No next expert available. Returning the response with feedback."
+        return $responseWithFeedback
+    }
+}
     
     [string] Feedback([ProjectTeam] $AssessedExpert, [string] $Expertinput) {
         Show-Header -HeaderText "Feedback by $($this.Name) ($($this.Role)) for $($AssessedExpert.name)"
@@ -724,8 +734,8 @@ function Show-Banner {
     Write-Host @'
  
 
-     /$$$$$$  /$$$$$$ /$$$$$$$   /$$$$$$  /$$$$$$$$ 
-    /$$__  $$|_  $$_/| $$__  $$ /$$__  $$|__  $$__/ Retrieval-Augmented Generation                          
+     /$$$$$$  /$$$$$$ /$$$$$$$   /$$$$$$  /Retrieval-Augmented Generation 
+    /$$__  $$|_  $$_/| $$__  $$ /$$__  $$|__  $$________________________/                           
    | $$  \ $$  | $$  | $$  \ $$| $$  \__/   | $$  /$$$$$$   /$$$$$$  /$$$$$$/$$$$ 
    | $$$$$$$$  | $$  | $$$$$$$/|  $$$$$$    | $$ /$$__  $$ |____  $$| $$_  $$_  $$
    | $$__  $$  | $$  | $$____/  \____  $$   | $$| $$$$$$$$  /$$$$$$$| $$ \ $$ \ $$
@@ -1454,65 +1464,6 @@ function Save-ProjectState {
     }
 }
 
-function Save-ProjectState_old2 {
-    param (
-        [string]$FilePath, # Path to save the project state
-        [PSCustomObject] $GlobalState  # Global state object containing project details
-    )
-    try {
-        # Create a hashtable to store the project state dynamically
-        $projectState = @{}
-        $GlobalState | Get-Member -MemberType Properties | ForEach-Object {
-            $projectState[$_.Name] = $GlobalState."$($_.Name)"
-        }
-        
-        # Export the project state to a file in XML format
-        $projectState | Export-Clixml -Path $FilePath
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the save process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-}
-
-function Save-ProjectState_old {
-    param (
-        [string]$FilePath, # Path to save the project state
-        [PSCustomObject] $GlobalState  # Global state object containing project details
-    )
-    try {
-        # Create a hashtable to store the project state
-        $projectState = @{
-            LastPSDevCode            = $GlobalState.lastPSDevCode            # Last PowerShell developer code
-            FileVersion              = $GlobalState.FileVersion              # Current file version
-            GlobalPSDevResponse      = $GlobalState.GlobalPSDevResponse      # Global PowerShell developer responses
-            GlobalResponse           = $GlobalState.GlobalResponse           # Global responses
-            TeamDiscussionDataFolder = $GlobalState.TeamDiscussionDataFolder # Folder for team discussion data
-            UserInput                = $GlobalState.userInput                # User input
-            OrgUserInput             = $GlobalState.OrgUserInput             # Original user input
-            LogFolder                = $GlobalState.LogFolder                # Folder for logs
-            MaxTokens                = $GlobalState.MaxTokens                # Maximum number of tokens
-            VerbosePrompt            = $GlobalState.VerbosePrompt            # Verbose prompt flag
-            NOTips                   = $GlobalState.NOTips                   # Disable tips flag
-            NOLog                    = $GlobalState.NOLog                    # Disable logging flag
-            NODocumentator           = $GlobalState.NODocumentator           # Disable documentator flag
-            NOPM                     = $GlobalState.NOPM                     # Disable project manager flag
-            RAG                      = $GlobalState.RAG                      # RAG (Retrieve and Generate) functionality flag
-            Stream                   = $GlobalState.Stream                   # Stream output flag
-            LLMProvider              = $GlobalState.LLMProvider              # LLM provide name
-        }
-        
-        # Export the project state to a file in XML format
-        $projectState | Export-Clixml -Path $FilePath
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the save process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-}
-
 function Get-ProjectState {
     param (
         [string]$FilePath
@@ -1537,81 +1488,6 @@ function Get-ProjectState {
         # Handle any exceptions that occur during the process
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path (split-path -Path $FilePath -Parent) "ERROR.txt")  
-    }
-}
-
-function Get-ProjectState_old {
-    param (
-        [string]$FilePath
-    )
-    try {
-        # Check if the specified file path exists
-        if (Test-Path -Path $FilePath) {
-            # Import the project state from the XML file
-            $projectState = Import-Clixml -Path $FilePath
-            
-            # Get keys and values from projectState and create GlobalState
-            $GlobalState = [PSCustomObject]@{}
-            $projectState.PSObject.Properties | ForEach-Object {
-                $GlobalState | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Value
-            }
-            
-            # Return the updated GlobalState object
-            return $GlobalState
-        }
-        else {
-            # Inform the user that the project state file was not found
-            Write-Host "-- Project state file not found."
-        }
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path (split-path -Path $FilePath -Parent) "ERROR.txt")  
-    }
-}
-
-function Get-ProjectState_old {
-    param (
-        [string]$FilePath
-    )
-    try {
-        # Check if the specified file path exists
-        if (Test-Path -Path $FilePath) {
-            # Import the project state from the XML file
-            $projectState = Import-Clixml -Path $FilePath
-            
-            # Update the GlobalState object with the imported project state values
-            $GlobalState.LastPSDevCode = $projectState.LastPSDevCode
-            $GlobalState.FileVersion = $projectState.FileVersion
-            $GlobalState.GlobalPSDevResponse = $projectState.GlobalPSDevResponse
-            $GlobalState.TeamDiscussionDataFolder = $projectState.TeamDiscussionDataFolder
-            $GlobalState.userInput = $projectState.UserInput
-            $GlobalState.GlobalResponse = $projectState.GlobalResponse
-            $GlobalState.OrgUserInput = $projectState.OrgUserInput
-            $GlobalState.LogFolder = $projectState.LogFolder
-            $GlobalState.MaxTokens = $projectState.MaxTokens
-            $GlobalState.VerbosePrompt = $projectState.VerbosePrompt
-            $GlobalState.NOTips = $projectState.NOTips
-            $GlobalState.NOLog = $projectState.NOLog
-            $GlobalState.NODocumentator = $projectState.NODocumentator
-            $GlobalState.NOPM = $projectState.NOPM
-            $GlobalState.RAG = $projectState.RAG
-            $GlobalState.Stream = $projectState.Stream
-            $GlobalState.LLMProvider = $projectState.LLMProvider
-            
-            # Return the updated GlobalState object
-            return $GlobalState
-        }
-        else {
-            # Inform the user that the project state file was not found
-            Write-Host "-- Project state file not found."
-        }
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
 }
 
@@ -1767,10 +1643,11 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         Write-Verbose "LogFolder: $LogFolder"
         Write-Verbose "Deployment: $Deployment"
 
-        # Call Azure OpenAI API
-        Write-Host "++ AZURE OpenAI ($Deployment) is working..."
+        # Notify the start of the Azure OpenAI process
+        Write-Host "++ Initiating Azure OpenAI process for deployment: $Deployment..."
+        
         if ($Stream) {
-            Write-Host "++ Streaming" -ForegroundColor Blue
+            Write-Host "++ Streaming mode enabled." -ForegroundColor Blue
         }
 
         # Invoke the Azure OpenAI chat completion function
@@ -1779,6 +1656,8 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
         }
+        
+        Write-Host "++ Azure OpenAI process initiated successfully for deployment: $Deployment."
 
         # Check if the response is null or empty
         if ([string]::IsNullOrEmpty($response)) {
@@ -1786,6 +1665,9 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
             Write-Error $errorMessage
             throw $errorMessage
         }
+
+        # Log the successful response
+        Write-Verbose "Azure OpenAI API response received successfully."
 
         return $response
     }
@@ -1827,12 +1709,14 @@ function Invoke-AIPSTeamOllamaCompletion {
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
     }
-    Write-Verbose $ollamaJson
+    Write-Verbose "Constructed JSON payload for Ollama API: $ollamaJson"
+
     # Define the URL for the Ollama API endpoint
     $url = "$($script:ollamaEndpoint)api/generate"
+    Write-Verbose "Ollama API endpoint URL: $url"
 
     # Notify the user that the Ollama model is processing
-    Write-Host "++ Ollama ($ollamaModel) is working..."
+    Write-Host "++ Ollama model ($ollamaModel) is processing your request..."
 
     # Check if streaming is enabled and handle accordingly
     if ($Stream) {
@@ -1911,6 +1795,8 @@ function Invoke-AIPSTeamOllamaCompletion {
     $this.AddLogEntry("SystemPrompt:`n$SystemPrompt")
     $this.AddLogEntry("UserPrompt:`n$UserPrompt")
     $this.AddLogEntry("Response:`n$response")
+    
+    Write-Host "++ Ollama model ($ollamaModel) has successfully processed your request."
 
     return $response.Trim('"')
 }
@@ -1929,10 +1815,13 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
     )
     $response = ""
 
+    # Define headers for the HTTP request
     $headers = @{
         "Content-Type"  = "application/json"
-        "Authorization" = "Bearer '$ApiKey'"
+        "Authorization" = "Bearer $ApiKey"
     }
+
+    # Construct the JSON body for the request
     $bodyJSON = [ordered]@{
         'model'       = $Model
         'messages'    = @(
@@ -1950,12 +1839,12 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         'stream'      = $Stream
         'max_tokens'  = $GlobalState.maxtokens
     } | ConvertTo-Json
-    Write-Verbose $bodyJSON
-    # Call lm-studio
-    #if ($modelResponse.data.Count -ne 0) {
-    $InfoText = "++ LM Studio" + $(if ($Model) { " ($Model)" } else { "" }) + " is working..."
+
+    Write-Verbose "Request Body JSON: $bodyJSON"
+
+    # Inform the user that the request is being processed
+    $InfoText = "++ LM Studio" + $(if ($Model) { " model ($Model)" } else { "" }) + " is processing your request..."
     Write-Host $InfoText
-    #}
 
     $url = "$($endpoint)chat/completions"
 
@@ -1971,7 +1860,7 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         $httpClient = [System.Net.Http.HttpClient]::new($httpClientHandler)
             
         # Set the required headers
-        $httpClient.DefaultRequestHeaders.Add("api-key", $script:lmstudioApiKey)
+        $httpClient.DefaultRequestHeaders.Add("api-key", $ApiKey)
             
         # Set the timeout for the HttpClient
         $httpClient.Timeout = New-TimeSpan -Seconds $timeoutSec
@@ -2001,7 +1890,6 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         $completeText = ""
         while ($null -ne ($line = $reader.ReadLine()) -or (-not $reader.EndOfStream)) {
             # Check if the line starts with "data: " and is not "data: [DONE]"
-            #Write-Verbose $line
             if ($line.StartsWith("data: ") -and $line -ne "data: [DONE]") {
                 # Extract the JSON part from the line
                 $jsonPart = $line.Substring(6)    
@@ -2017,7 +1905,7 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
                     Write-Host $delta -NoNewline -ForegroundColor White
                 }
                 catch {
-                    Write-Error $_
+                    Write-Error "Error parsing JSON: $_"
                 }
             }
         }
@@ -2055,6 +1943,9 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
     [void]($this.AddLogEntry("SystemPrompt:`n$SystemPrompt"))
     [void]($this.AddLogEntry("UserPrompt:`n$UserPrompt"))
     [void]($this.AddLogEntry("Response:`n$Response"))
+    
+    $InfoText = "++ LM Studio" + $(if ($Model) { " model ($Model)" } else { "" }) + " has successfully processed your request."
+    Write-Host $InfoText
 
     return $response
 }
@@ -2371,7 +2262,7 @@ $($userInput.trim())
 
         Write-Verbose "RAG agent processed the input and returned a shortened user input."
 
-        Write-Host ">> RAG is on. Attempting to augment AI Agent data..." -ForegroundColor Green
+        Write-Host ">> RAG is active. Enhancing AI Agent data..." -ForegroundColor Green
 
         # Check if the shortened user input is not empty
         if (-not [string]::IsNullOrEmpty($ShortenedUserInput)) {
@@ -2445,7 +2336,7 @@ Ensure your response is focused and directly related to the provided description
 "@
         $RAGresponse = $RAGAgent.ProcessInput($RAGuserinput, $prompt)
         if ($RAGresponse) {
-            Write-Host "++ RAG is on. AI Agent data was successfully augmented with new data." -ForegroundColor Green
+            Write-Host "++ RAG is active. The AI Agent has been successfully updated with the latest data." -ForegroundColor Green
         }
         
         # Return the response generated by the project manager
@@ -2955,16 +2846,6 @@ if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
         } 
     }
 
-    # Check if Ollama is installed
-    #$ollamaInstalled = Test-OllamaInstalled
-    #if (-not $ollamaInstalled) {
-    #    Write-Warning "-- Ollama is not installed. Please install Ollama and ensure it is in your PATH."
-    #    return
-    #}
-    #else {
-    #    Write-Host "++ Ollama is installed at: $ollamaInstalled"
-    #}
-    # Test if the Ollama API is reachable
     if (Test-OllamaAPI) {
         Write-Host "++ Ollama API is reachable."
         
@@ -2983,39 +2864,6 @@ if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
         Write-Warning "-- Ollama API is not reachable. Please check your Ollama installation and configuration."
         return
     }
-
-    # Check if Ollama is running
-    #$ollamaRunning = Test-OllamaRunning
-    #if (-not $ollamaRunning) {
-    #    Write-Host "-- Ollama is not running. Attempting to start Ollama..." -ForegroundColor Yellow
-    #    if (Start-OllamaInNewConsole) {
-    #        Write-Host "++ Ollama started successfully."
-    #    }
-    #    else {
-    #        Write-Warning "Failed to start Ollama."
-    #        return
-    #    }
-    #}
-    #else {
-    #    Write-Verbose "++ Ollama is running."
-    #}
-
-    # Ensure a model is running
-    #$runningModelOllama = Test-OllamaRunningModel
-    #if ($runningModelOllama) {
-    #    Set-EnvOllamaModel -model $runningModelOllama
-    #}
-    #else {
-    #    if (Start-OllamaModel) {
-    #        $runningModel = Test-OllamaRunningModel -NOInfo
-    #        if ($runningModel) {
-    #            if (Test-EnsureOllamaModelRunning) {
-    #                Set-EnvOllamaModel -model $runningModel
-    #            }
-    #        }
-    #    }
-    #Write-Host "-- No models are currently running in Ollama. Please check your server and settings." -ForegroundColor Red
-    #}
     Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
 }
 #endregion ollama
