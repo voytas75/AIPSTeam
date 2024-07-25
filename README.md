@@ -138,9 +138,9 @@ To configure the script to use external providers, you need to set the following
    Example:
 
    ```powershell
-   [System.Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_ENDPOINT','https://<your-endpoint>.openai.azure.com','user')
-   [System.Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_APIVERSION','2024-05-01-preview','user')
-   [System.Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT','your-deployment-name','user')
+   [Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_ENDPOINT','https://<your-endpoint>.openai.azure.com','user')
+   [Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_APIVERSION','2024-05-01-preview','user')
+   [Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT','your-deployment-name','user')
    ```
 
 > [!IMPORTANT]
@@ -153,7 +153,7 @@ To configure the script to use external providers, you need to set the following
 The `OLLAMA_ENDPOINT` environment variable is set to a default value of `http://localhost:11434/` by the script. If you need to use a different endpoint, you must manually change the value of this environment variable. You can do this by using the following command:
 
 ```powershell
-[System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT','your-ollama-api-endpoint-uri','user')
+[Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT','your-ollama-api-endpoint-uri','user')
 ```
 
 > [!IMPORTANT]
@@ -162,7 +162,7 @@ The `OLLAMA_ENDPOINT` environment variable is set to a default value of `http://
    Example:
 
    ```powershell
-   [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL','ollama model, example: phi3:latest','user')
+   [Environment]::SetEnvironmentVariable('OLLAMA_MODEL','ollama model, example: phi3:latest','user')
    ```
 
 3. **LM Studio**:
@@ -172,8 +172,8 @@ The `OLLAMA_ENDPOINT` environment variable is set to a default value of `http://
    Example:
 
    ```powershell
-   [System.Environment]::SetEnvironmentVariable('OPENAI_API_KEY','lm-studio','user')
-   [System.Environment]::SetEnvironmentVariable('OPENAI_API_BASE','http://localhost:1234/v1','user')
+   [Environment]::SetEnvironmentVariable('OPENAI_API_KEY','lm-studio','user')
+   [Environment]::SetEnvironmentVariable('OPENAI_API_BASE','http://localhost:1234/v1','user')
    ```
 
 4. **RAG Configuration**:
@@ -183,8 +183,8 @@ The `OLLAMA_ENDPOINT` environment variable is set to a default value of `http://
    Example:
 
    ```powershell
-   [System.Environment]::SetEnvironmentVariable('AZURE_BING_API_KEY','your-azure-bing-api-key','user')
-   [System.Environment]::SetEnvironmentVariable('AZURE_BING_ENDPOINT','https://api.bing.microsoft.com/','user')
+   [Environment]::SetEnvironmentVariable('AZURE_BING_API_KEY','your-azure-bing-api-key','user')
+   [Environment]::SetEnvironmentVariable('AZURE_BING_ENDPOINT','https://api.bing.microsoft.com/','user')
    ```
 
 [Bing Search API documentation](https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/)
