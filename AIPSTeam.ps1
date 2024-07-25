@@ -2032,15 +2032,21 @@ function Invoke-BingWebSearch {
     try {
         # Make the API request to Bing Search
         Write-Verbose "Making API request to Bing Search."
+        Write-Host "++ Status: Initiating Bing Search API request..." -ForegroundColor Cyan
         $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -Body $params
 
         # Check if the response contains web pages
         if ($null -eq $response.webPages.value) {
             Write-Warning "No web pages found for the query: $query"
+            Write-Host "++ Status: No web pages found for the query: $query" -ForegroundColor Yellow
             return $null
         }
+        # Display the status for the user
+        Write-Host "++ Status: Bing Search API request completed successfully." -ForegroundColor Green
+        Write-Host "++ Status: Number of web pages found: $($response.webPages.value.Count)" -ForegroundColor Green
 
         Write-Verbose "API request successful. Returning search results."
+        
         # Return the search results
         return $response.webPages.value
     }

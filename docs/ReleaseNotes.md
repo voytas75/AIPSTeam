@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.6.2] - unpublished
+## [3.6.2] - 2024.07.26 unpublished
+
+- Minor fixes and code formatting improvements.
+- Added information message.
 
 ## [3.6.1] - 2024.07.25
 
@@ -41,7 +44,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [3.2.1]
 
-- minor changes and fixes, issue #2 - add env for ollama endpoint
+- minor changes and fixes, issue #2 - add env for ollama endpoint.
 
 ## [3.1.1]
 
@@ -49,7 +52,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [3.0.3]
 
-- Corrected log entry method usage
+- Corrected log entry method usage.
 
 ## [3.0.2]
 
@@ -73,11 +76,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [1.6.2]
 
-- fix double feedback display. 
+- fix double feedback display.
 
 ## [1.6.1]
 
-- fix stream in feedback. 
+- fix stream in feedback.
 
 ## [1.6.0]
 
@@ -97,7 +100,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [1.2.1]
 
-- fix EXTERNALMODULEDEPENDENCIES
+- fix EXTERNALMODULEDEPENDENCIES.
 
 ## [1.2.0]
 
