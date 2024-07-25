@@ -18,7 +18,7 @@
 Emulates a team of AI-powered Agents with RAG collaborating on a PowerShell project.
 
 .DESCRIPTION 
-This script simulates a team of AI-powered Agents with RAG, each with a unique role in executing a project. User input is processed by one AI specialist, who performs their task and passes the result to the next AI Agent. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
+This script simulates a team of AI-powered Agents with RAG, each with a unique role in executing a Powershell project. User input is processed by one AI specialist, who performs their task and passes the result to the next AI Agent. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
 
 .PARAMETER userInput 
 Defines the project outline as a string. This parameter can also accept input from the pipeline.
@@ -87,7 +87,7 @@ param(
     [Parameter(Mandatory = $false, HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
     [bool] $Stream = $true,
     
-    [Parameter(Mandatory = $false, HelpMessage = "Disables the RAG (Retrieve and Generate) functionality.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Disables the RAG functionality.")]
     [switch] $NORAG,
 
     [Parameter(Mandatory = $false, HelpMessage = "Disables the Project Manager functions when used.")]
