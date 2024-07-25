@@ -81,43 +81,43 @@ https://github.com/voytas75/AIPSTeam/
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false, ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string.")]
+    [Parameter(ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string.")]
     [string] $userInput,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
+    [Parameter(HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
     [bool] $Stream = $true,
     
-    [Parameter(Mandatory = $false, HelpMessage = "Disables the RAG functionality.")]
+    [Parameter(HelpMessage = "Disables the RAG functionality.")]
     [switch] $NORAG,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Disables the Project Manager functions when used.")]
+    [Parameter(HelpMessage = "Disables the Project Manager functions when used.")]
     [switch] $NOPM,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Disables the Documentator functions when used.")]
+    [Parameter(HelpMessage = "Disables the Documentator functions when used.")]
     [switch] $NODocumentator,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Disables the logging functions when used.")]
+    [Parameter(HelpMessage = "Disables the logging functions when used.")]
     [switch] $NOLog,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Disables tips.")]
+    [Parameter(HelpMessage = "Disables tips.")]
     [switch] $NOTips,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Shows prompts.")]
+    [Parameter(HelpMessage = "Shows prompts.")]
     [switch] $VerbosePrompt,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the folder where logs should be stored.")]
+    [Parameter(HelpMessage = "Specifies the folder where logs should be stored.")]
     [string] $LogFolder,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the deployment chat environment variable for PSAOAI (AZURE OpenAI).")]
+    [Parameter(HelpMessage = "Specifies the deployment chat environment variable for PSAOAI (AZURE OpenAI).")]
     [string] $DeploymentChat = [System.Environment]::GetEnvironmentVariable("PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT", "User"),
 
-    [Parameter(Mandatory = $false, ParameterSetName = 'LoadStatus', HelpMessage = "Loads the project status from a specified path.")]
+    [Parameter(ParameterSetName = 'LoadStatus', HelpMessage = "Loads the project status from a specified path.")]
     [string] $LoadProjectStatus,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the maximum number of tokens to generate in the response. Default is 20480.")]
+    [Parameter(HelpMessage = "Specifies the maximum number of tokens to generate in the response. Default is 20480.")]
     [int] $MaxTokens = 20480,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
+    [Parameter(HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
@@ -650,9 +650,9 @@ function Add-ToGlobalPSDevResponses {
 
 function New-FolderAtPath {
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [string]$Path, # The path where the new folder will be created
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$FolderName  # The name of the new folder to be created
     )
 
@@ -772,9 +772,9 @@ function Show-Banner {
 
 function Export-AndWritePowerShellCodeBlocks {
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [string]$InputString,
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$OutputFilePath,
         [string]$StartDelimiter,
         [string]$EndDelimiter
@@ -822,9 +822,9 @@ function Export-AndWritePowerShellCodeBlocks {
 
 function Invoke-CodeWithPSScriptAnalyzer {
     param(
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$FilePath,
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$ScriptBlock
     )
 
@@ -873,7 +873,7 @@ function Invoke-CodeWithPSScriptAnalyzer {
 
 function Show-Header {
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [string]$HeaderText,
         [switch]$output
     )
@@ -891,9 +891,9 @@ function Show-Header {
 
 function Get-SourceCodeAnalysis {
     param(
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$FilePath,
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$CodeBlock
     )
 
@@ -971,9 +971,9 @@ function Get-CyclomaticComplexity {
         Date: 2024-06-21
     #>
     param(
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$FilePath,
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$CodeBlock
     )
 
@@ -1122,13 +1122,13 @@ Your guidelines should provide a clear roadmap for enhancing the existing script
 
 function Set-FeedbackAndGenerateResponse {
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [object]$Reviewer,
         
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [object]$Recipient,
 
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$tipAmount,
         
         [PSCustomObject] $GlobalState
@@ -1243,13 +1243,13 @@ function Update-GlobalStateWithResponse {
 # Refactor Invoke-ProcessFeedbackAndResponse to use the new functions
 function Invoke-ProcessFeedbackAndResponse {
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [object]$Reviewer,
         
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [object]$Recipient,
 
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$tipAmount,
 
         [PSCustomObject] $GlobalState
@@ -1493,7 +1493,7 @@ function Get-ProjectState {
 
 function Update-ErrorHandling {
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [System.Management.Automation.ErrorRecord]$ErrorRecord,
 
         [string]$ErrorContext,
@@ -1952,19 +1952,19 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
 
 function Invoke-BingWebSearch {
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [string]$query, # The search query
 
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$apiKey,
         
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$endpoint,
         
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [string]$language = "en-US", # The language for the search results
         
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [int]$count  # The number of search results to return
     )
 
