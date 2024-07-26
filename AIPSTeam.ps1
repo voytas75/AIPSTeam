@@ -176,7 +176,6 @@ class ProjectTeam {
         $this.LogFilePath = "$($GlobalState.TeamDiscussionDataFolder)\$name.log"
         $this.FeedbackTeam = @()
         $this.LLMProvider = "AzureOpenAI"  # Default to AzureOpenAI, can be changed as needed
-        
     }
 
     # Method to display the team member's information
@@ -2799,15 +2798,14 @@ function Test-NeedForMoreInfo {
         $systemPrompt = @"
 You are an AI assistant tasked with evaluating user inputs for completeness and clarity. Your job is to determine if more information or context is needed to fully understand or address the user's input for Powershell project.
 
-For each user input, respond with a single number between 0,00 and 1,00, where:
+For user input, respond with a single number between 0,00 and 1,00, where:
 0,00 = No additional information or context needed
 1,00 = Significant additional information or context needed
 
-Use decimal values between 0 and 1 to indicate varying degrees of need for more information. 
-Examples:
-- 0,25 = Minimal additional information needed
-- 0,5 = Moderate amount of additional information needed
-- 0,75 = Substantial additional information needed
+Use decimal values between 0,00 and 1,00 to indicate varying degrees of need for more information. 
+Example 1: 0,25 = Minimal additional information needed
+Example 2: 0,5 = Moderate amount of additional information needed
+Example 3: 0,75 = Substantial additional information needed
 
 Consider factors such as:
 - Clarity of the request or statement
@@ -2838,6 +2836,7 @@ Provide only the numerical score without any explanation or additional text.
 
         Write-Verbose "Determining if more information is needed based on the response."
         # Determine if more information is needed and return true or false
+        $needMoreInfo = $parsedValue
         return $needMoreInfo -ge $positiveLimit
     }
     catch {
@@ -3539,8 +3538,50 @@ if (-not $GlobalState.NOLog) {
     Start-Transcript -Path (join-path $GlobalState.TeamDiscussionDataFolder "TRANSCRIPT.log") -Append
 }
 
-Test-NeedForMoreInfo -userInput $userInput
-return
+#region NeedForMoreInfoTest
+# Verbose message indicating the start of the need for more information test
+Write-Verbose "Starting the Test-NeedForMoreInfo function to evaluate user input."
+
+do {
+    # Call the Test-NeedForMoreInfo function with the provided user input
+    $needMoreInfo = Test-NeedForMoreInfo -userInput $userInput
+
+    # Add a message to inform the user about the status of the need for more information
+    if ($needMoreInfo) {
+        Write-Host "-- Additional information is needed to fully understand or address the user's input."
+        Write-Host ">> User input: '$userInput'"
+
+        Write-Host "|  To ensure the AI Agents Team can create a comprehensive PowerShell project, please include the following elements in your description:"
+        Write-Host "|  1. Project Objective: Clearly state the main goal or purpose of the project."
+        Write-Host "|  2. Key Features: List the primary features or functionalities that the project should include."
+        Write-Host "|  3. User Requirements: Describe the specific needs or requirements of the end-users."
+        Write-Host "|  4. Technical Specifications: Provide any technical details, such as required modules, dependencies, or system configurations."
+        Write-Host "|  5. Constraints: Mention any limitations or constraints that need to be considered (e.g., budget, time, resources)."
+        Write-Host "|  6. Success Criteria: Define the criteria that will be used to measure the success of the project."
+        Write-Host "|  7. Additional Context: Provide any other relevant information or context that could help the AI Agents Team understand the project better."
+
+        $additionalInput = Read-Host ">> Please provide more details in your description and context. (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)"
+        # Provide detailed information about the elements that must be included in the description for the AI Agents Team to create a comprehensive PowerShell project.
+
+        # Check if the user wants to quit providing additional input
+        if ($additionalInput -in @('q',"Q","quit")) {
+            Write-Host "++ Proceeding with the current input as is."
+            $needMoreInfo = $false
+        } elseif ($additionalInput) {
+            $userInput += " " + $additionalInput
+        } else {
+            Write-Host "++ No additional information provided. Using current input as is."
+            $needMoreInfo = $false
+        }
+    } else {
+        Write-Host "++ No additional information is needed; the user's input is clear and complete."
+    }
+} while ($needMoreInfo)
+
+# Verbose message indicating the end of the need for more information test
+Write-Verbose "Completed the Test-NeedForMoreInfo function."
+#endregion NeedForMoreInfoTest
+
 
 $RAGpromptAddon = $null
 if ($GlobalState.RAG -and (-not $LoadProjectStatus)) {
