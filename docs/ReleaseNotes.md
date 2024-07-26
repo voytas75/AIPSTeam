@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - Minor fixes and code formatting improvements.
 - Added information message.
 - Improve cleaning function.
+- Fix passing of maxtokens value
 
 ## [3.6.1] - 2024.07.25
 

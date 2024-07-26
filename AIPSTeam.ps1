@@ -1578,33 +1578,43 @@ function Invoke-LLMChatCompletion {
     try {
         # Check if verbose prompts are enabled and display them
         if ($GlobalState.VerbosePrompt) {
-            Write-Host $SystemPrompt -ForegroundColor DarkMagenta
-            Write-Host $UserPrompt -ForegroundColor DarkMagenta
+            Write-Host "System Prompt: $SystemPrompt" -ForegroundColor DarkMagenta
+            Write-Host "User Prompt: $UserPrompt" -ForegroundColor DarkMagenta
         }
 
         # Switch between different LLM providers based on the provider parameter
         switch ($Provider) {
             "ollama" {
+                # Verbose message for invoking Ollama model
+                Write-Verbose "Invoking Ollama model completion function."
                 # Invoke the Ollama model completion function
                 $response = Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
                 return $response
             }
             "LMStudio" {
+                # Verbose message for invoking LMStudio model
+                Write-Verbose "Invoking LMStudio chat completion function."
                 # Handle streaming for LMStudio provider
                 # Invoke the LMStudio chat completion function
                 $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey $script:lmstudioApiKey -endpoint $script:lmstudioApiBase -Model $script:LMStudioModel
                 return $response
             }
             "OpenAI" {
+                # Verbose message for unsupported LLM provider
+                Write-Verbose "Unsupported LLM provider: $Provider."
                 # Throw an exception for unsupported LLM provider
                 throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
             }
             "AzureOpenAI" {
+                # Verbose message for invoking Azure OpenAI model
+                Write-Verbose "Invoking Azure OpenAI chat completion function."
                 # Invoke the Azure OpenAI chat completion function
-                $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
+                $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat -MaxTokens $MaxTokens
                 return $response
             }
             default {
+                # Verbose message for unknown LLM provider
+                Write-Verbose "Unknown LLM provider: $Provider."
                 # Throw an exception for unknown LLM provider
                 throw "!! Unknown LLM provider: $Provider"
             }
@@ -2774,6 +2784,68 @@ function Test-EnsureOllamaModelRunning {
     }
     return $false
 }
+
+function Test-NeedForMoreInfo {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$userInput,
+        [Parameter(Mandatory = $false)]
+        [double]$positiveLimit = 0.5
+    )
+
+    try {
+        Write-Verbose "Defining the system prompt and user prompt for the LLM."
+        # Define the system prompt and user prompt for the LLM
+        $systemPrompt = @"
+You are an AI assistant tasked with evaluating user inputs for completeness and clarity. Your job is to determine if more information or context is needed to fully understand or address the user's input for Powershell project.
+
+For each user input, respond with a single number between 0,00 and 1,00, where:
+0,00 = No additional information or context needed
+1,00 = Significant additional information or context needed
+
+Use decimal values between 0 and 1 to indicate varying degrees of need for more information. 
+Examples:
+- 0,25 = Minimal additional information needed
+- 0,5 = Moderate amount of additional information needed
+- 0,75 = Substantial additional information needed
+
+Consider factors such as:
+- Clarity of the request or statement
+- Specificity of the information provided
+- Presence of ambiguous terms or concepts
+- Completeness of the context
+
+Provide only the numerical score without any explanation or additional text.
+"@
+        $userPrompt = "User input: $userInput"
+
+        Write-Verbose "Sending the prompt to the LLM."
+        # Send the prompt to the LLM
+        #$response = Invoke-LLMChatCompletion -Provider "AzureOpenAI" -SystemPrompt $systemPrompt -UserPrompt $userPrompt -Temperature 0.7 -TopP 1.0 -MaxTokens 50 -Stream $false -LogFolder "C:\Logs" -DeploymentChat "default"
+        [string]$response = (Invoke-LLMChatCompletion -Provider $script:GlobalState.LLMProvider -SystemPrompt $systemPrompt -UserPrompt $userPrompt -Temperature 0.7 -TopP 1 -MaxTokens 10 -Stream $false -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel).trim()
+        Write-Verbose "LLM Response: '$response'"
+        if ($response -match '\.') {
+            $response = $response -replace '\.', ','
+        }
+
+        Write-Verbose "Validating and parsing the response from the LLM."
+        # Validate and parse the response
+        [double]$parsedValue = 0.00
+        
+        if (-not [double]::TryParse($response, [ref]$parsedValue)) {
+            throw "Invalid response received from LLM. Expected a numeric value but got: '$response'. Please check the LLM configuration and input."
+        }
+
+        Write-Verbose "Determining if more information is needed based on the response."
+        # Determine if more information is needed and return true or false
+        return $needMoreInfo -ge $positiveLimit
+    }
+    catch {
+        $functionName = $MyInvocation.MyCommand.Name
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $script:GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        return $false
+    }
+}
 #endregion Functions
 
 #region Setting Up
@@ -2828,6 +2900,8 @@ if (-not $LoadProjectStatus) {
 [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
 $env:PSAOAI_BANNER = "0"
 
+Show-Banner
+
 # Check if the UserInput parameter is not provided
 if (-not $UserInput) {
     if (-not $LoadProjectStatus) {
@@ -2837,8 +2911,6 @@ if (-not $UserInput) {
         $GlobalState.UserInput = $UserInput
     }
 }
-
-Show-Banner
 
 #region ollama
 if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
@@ -3467,6 +3539,9 @@ if (-not $GlobalState.NOLog) {
     Start-Transcript -Path (join-path $GlobalState.TeamDiscussionDataFolder "TRANSCRIPT.log") -Append
 }
 
+Test-NeedForMoreInfo -userInput $userInput
+return
+
 $RAGpromptAddon = $null
 if ($GlobalState.RAG -and (-not $LoadProjectStatus)) {
     $RAGSummarizePrompt = @"
@@ -3495,6 +3570,7 @@ if (-not $LoadProjectStatus) {
     #region PM-PSDev
     $userInputOryginal = $userInput
     $GlobalState.OrgUserInput = $userInputOryginal
+
     $projectManagerPrompt = @"
 Write detailed and concise PowerShell project name, description, objectives, deliverables, additional considerations, and success criteria based on user input and RAG data.
 
