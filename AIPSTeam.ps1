@@ -38,6 +38,9 @@ Disables the logging functions when used.
 .PARAMETER NOTips
 Disables tips.
 
+.PARAMETER NOUserInputCheck
+Disables input check.
+
 .PARAMETER VerbosePrompt
 Shows prompts.
 
@@ -287,88 +290,88 @@ class ProjectTeam {
         }
     }
 
-[string] ProcessInput([string] $userinput, [string] $systemprompt) {
-    Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
+    [string] ProcessInput([string] $userinput, [string] $systemprompt) {
+        Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
     
-    # Log the input
-    $this.AddLogEntry("Processing input:`n$userinput")
+        # Log the input
+        $this.AddLogEntry("Processing input:`n$userinput")
     
-    # Update status
-    $this.Status = "In Progress"
-    $response = ""
-    try {
-        # Ensure ResponseMemory is initialized
-        if ($null -eq $this.ResponseMemory) {
-            $this.ResponseMemory = @()
-            $this.AddLogEntry("Initialized ResponseMemory")
-        }
-        
-        # Initialize loop variables
-        $loopCount = 0
-        $maxLoops = 5
-        
-        # Attempt to get a response from the LLM
-        do {
-            Write-Verbose "Attempting to get a response from LLM. Loop count: $loopCount"
-            $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
-            
-            if (-not [string]::IsNullOrEmpty($response)) {
-                Write-Verbose "Received a valid response from LLM."
-                break
+        # Update status
+        $this.Status = "In Progress"
+        $response = ""
+        try {
+            # Ensure ResponseMemory is initialized
+            if ($null -eq $this.ResponseMemory) {
+                $this.ResponseMemory = @()
+                $this.AddLogEntry("Initialized ResponseMemory")
             }
+        
+            # Initialize loop variables
+            $loopCount = 0
+            $maxLoops = 5
+        
+            # Attempt to get a response from the LLM
+            do {
+                Write-Verbose "Attempting to get a response from LLM. Loop count: $loopCount"
+                $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
             
-            Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
-            Start-Sleep -Seconds 10
-            $loopCount++
-        } while ($loopCount -lt $maxLoops)
+                if (-not [string]::IsNullOrEmpty($response)) {
+                    Write-Verbose "Received a valid response from LLM."
+                    break
+                }
+            
+                Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
+                Start-Sleep -Seconds 10
+                $loopCount++
+            } while ($loopCount -lt $maxLoops)
 
-        # Display the response if streaming is not enabled
-        if (-not $script:GlobalState.Stream) {
-            Write-Host $response -ForegroundColor White
+            # Display the response if streaming is not enabled
+            if (-not $script:GlobalState.Stream) {
+                Write-Host $response -ForegroundColor White
+            }
+        
+            # Log the response
+            $this.AddLogEntry("Generated response:`n$response")
+        
+            # Store the response in memory with timestamp
+            $this.ResponseMemory.Add([PSCustomObject]@{
+                    Response  = $response
+                    Timestamp = Get-Date
+                })
+        
+            $feedbackSummary = ""
+            if ($this.FeedbackTeam.count -gt 0) {
+                # Request feedback for the response
+                Write-Verbose "Requesting feedback for the response."
+                $feedbackSummary = $this.RequestFeedback($response)
+                # Log the feedback summary
+                $this.AddLogEntry("Feedback summary:`n$feedbackSummary")
+            }
+        
+            # Integrate feedback into response
+            $responseWithFeedback = "$response`n`n$feedbackSummary"
+        
+            # Update status
+            $this.Status = "Completed"
         }
-        
-        # Log the response
-        $this.AddLogEntry("Generated response:`n$response")
-        
-        # Store the response in memory with timestamp
-        $this.ResponseMemory.Add([PSCustomObject]@{
-                Response  = $response
-                Timestamp = Get-Date
-            })
-        
-        $feedbackSummary = ""
-        if ($this.FeedbackTeam.count -gt 0) {
-            # Request feedback for the response
-            Write-Verbose "Requesting feedback for the response."
-            $feedbackSummary = $this.RequestFeedback($response)
-            # Log the feedback summary
-            $this.AddLogEntry("Feedback summary:`n$feedbackSummary")
+        catch {
+            # Log the error
+            $this.AddLogEntry("Error:`n$_")
+            # Update status
+            $this.Status = "Error"
+            throw $_
         }
-        
-        # Integrate feedback into response
-        $responseWithFeedback = "$response`n`n$feedbackSummary"
-        
-        # Update status
-        $this.Status = "Completed"
-    }
-    catch {
-        # Log the error
-        $this.AddLogEntry("Error:`n$_")
-        # Update status
-        $this.Status = "Error"
-        throw $_
-    }
 
-    # Pass to the next expert if available
-    if ($null -ne $this.NextExpert) {
-        Write-Verbose "Passing response to the next expert."
-        return $this.NextExpert.ProcessInput($responseWithFeedback)
+        # Pass to the next expert if available
+        if ($null -ne $this.NextExpert) {
+            Write-Verbose "Passing response to the next expert."
+            return $this.NextExpert.ProcessInput($responseWithFeedback)
+        }
+        else {
+            Write-Verbose "No next expert available. Returning the response with feedback."
+            return $responseWithFeedback
+        }
     }
-    else {
-        Write-Verbose "No next expert available. Returning the response with feedback."
-        return $responseWithFeedback
-    }
-}
     
     [string] Feedback([ProjectTeam] $AssessedExpert, [string] $Expertinput) {
         Show-Header -HeaderText "Feedback by $($this.Name) ($($this.Role)) for $($AssessedExpert.name)"
@@ -3542,50 +3545,56 @@ if (-not $GlobalState.NOLog) {
 }
 
 #region NeedForMoreInfoTest
-# Verbose message indicating the start of the need for more information test
-Write-Verbose "Starting the Test-NeedForMoreInfo function to evaluate user input."
 
-do {
-    # Call the Test-NeedForMoreInfo function with the provided user input
-    $needMoreInfo = Test-NeedForMoreInfo -userInput $userInput
+if (-not $NOUserInputCheck) {
+    # Verbose message indicating the start of the need for more information test
+    Write-Verbose "Starting the Test-NeedForMoreInfo function to evaluate user input."
 
-    # Add a message to inform the user about the status of the need for more information
-    if ($needMoreInfo) {
-        Write-Host "-- Additional information is needed to fully understand or address the user's input."
-        Write-Host ">> User input: '$userInput'"
+    do {
+        # Call the Test-NeedForMoreInfo function with the provided user input
+        $needMoreInfo = Test-NeedForMoreInfo -userInput $userInput
 
-        Write-Host "|  To ensure the AI Agents Team can create a comprehensive PowerShell project, please include the following elements in your description:"
-        Write-Host "|  1. Project Objective: Clearly state the main goal or purpose of the project."
-        Write-Host "|  2. Key Features: List the primary features or functionalities that the project should include."
-        Write-Host "|  3. User Requirements: Describe the specific needs or requirements of the end-users."
-        Write-Host "|  4. Technical Specifications: Provide any technical details, such as required modules, dependencies, or system configurations."
-        Write-Host "|  5. Constraints: Mention any limitations or constraints that need to be considered (e.g., budget, time, resources)."
-        Write-Host "|  6. Success Criteria: Define the criteria that will be used to measure the success of the project."
-        Write-Host "|  7. Additional Context: Provide any other relevant information or context that could help the AI Agents Team understand the project better."
+        # Add a message to inform the user about the status of the need for more information
+        if ($needMoreInfo) {
+            Write-Host "-- Additional information is needed to fully understand or address the user's input."
+            Write-Host ">> User input: '$userInput'"
 
-        Write-Host ">> Please provide more details in your description and context."
-        Write-Host ">> (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)"
-        $additionalInput = Read-Host ">> "
+            Write-Host "|  To ensure the AI Agents Team can create a comprehensive PowerShell project, please include the following elements in your description:"
+            Write-Host "|  1. Project Objective: Clearly state the main goal or purpose of the project."
+            Write-Host "|  2. Key Features: List the primary features or functionalities that the project should include."
+            Write-Host "|  3. User Requirements: Describe the specific needs or requirements of the end-users."
+            Write-Host "|  4. Technical Specifications: Provide any technical details, such as required modules, dependencies, or system configurations."
+            Write-Host "|  5. Constraints: Mention any limitations or constraints that need to be considered (e.g., budget, time, resources)."
+            Write-Host "|  6. Success Criteria: Define the criteria that will be used to measure the success of the project."
+            Write-Host "|  7. Additional Context: Provide any other relevant information or context that could help the AI Agents Team understand the project better."
 
-        # Provide detailed information about the elements that must be included in the description for the AI Agents Team to create a comprehensive PowerShell project.
+            Write-Host ">> Please provide more details in your description and context."
+            Write-Host ">> (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)"
+            $additionalInput = Read-Host ">> "
 
-        # Check if the user wants to quit providing additional input
-        if ($additionalInput -in @('q',"Q","quit")) {
-            Write-Host "++ Proceeding with the current input as is."
-            $needMoreInfo = $false
-        } elseif ($additionalInput) {
-            $userInput += " " + $additionalInput
-        } else {
-            Write-Host "++ No additional information provided. Using current input as is."
-            $needMoreInfo = $false
+            # Provide detailed information about the elements that must be included in the description for the AI Agents Team to create a comprehensive PowerShell project.
+
+            # Check if the user wants to quit providing additional input
+            if ($additionalInput -in @('q', "Q", "quit")) {
+                Write-Host "++ Proceeding with the current input as is."
+                $needMoreInfo = $false
+            }
+            elseif ($additionalInput) {
+                $userInput += " " + $additionalInput
+            }
+            else {
+                Write-Host "++ No additional information provided. Using current input as is."
+                $needMoreInfo = $false
+            }
         }
-    } else {
-        Write-Host "++ No additional information is needed; the user's input is clear and complete."
-    }
-} while ($needMoreInfo)
+        else {
+            Write-Host "++ No additional information is needed; the user's input is clear and complete."
+        }
+    } while ($needMoreInfo)
 
-# Verbose message indicating the end of the need for more information test
-Write-Verbose "Completed the Test-NeedForMoreInfo function."
+    # Verbose message indicating the end of the need for more information test
+    Write-Verbose "Completed the Test-NeedForMoreInfo function."
+}
 #endregion NeedForMoreInfoTest
 
 
