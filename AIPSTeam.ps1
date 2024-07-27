@@ -3560,7 +3560,10 @@ do {
         Write-Host "|  6. Success Criteria: Define the criteria that will be used to measure the success of the project."
         Write-Host "|  7. Additional Context: Provide any other relevant information or context that could help the AI Agents Team understand the project better."
 
-        $additionalInput = Read-Host ">> Please provide more details in your description and context. (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)"
+        Write-Host ">> Please provide more details in your description and context."
+        Write-Host ">> (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)"
+        $additionalInput = Read-Host ">> "
+
         # Provide detailed information about the elements that must be included in the description for the AI Agents Team to create a comprehensive PowerShell project.
 
         # Check if the user wants to quit providing additional input
