@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - Improve cleaning function.
 - Fix passing of maxtokens value.
 - Added new function `Test-NeedForMoreInfo` to assess if additional information is required for processing.
+- Removed excess [System.] references. (thx https://github.com/NathanWindisch)
+- Removed excess parameters in Mandatory flag. (thx https://github.com/NathanWindisch)
 
 ## [3.6.1] - 2024.07.25
 
