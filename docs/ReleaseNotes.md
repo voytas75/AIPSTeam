@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 ## [3.7.2] - 2024.07.27 unpublished
 
 - Improved user prompts for input.
+- Add parameter `NOUserInputCheck`.
 
 ## [3.7.1] - 2024.07.27
 

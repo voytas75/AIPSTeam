@@ -102,6 +102,9 @@ param(
     [Parameter(HelpMessage = "Disables tips.")]
     [switch] $NOTips,
 
+    [Parameter(HelpMessage = "Disables input check.")]
+    [switch] $NOUserInputCheck,
+
     [Parameter(HelpMessage = "Shows prompts.")]
     [switch] $VerbosePrompt,
 

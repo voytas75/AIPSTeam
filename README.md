@@ -24,7 +24,6 @@
     - [Key Functions and Logic](#key-functions-and-logic)
   - [Installation Instructions](#installation-instructions)
   - [Dependencies and Prerequisites](#dependencies-and-prerequisites)
-  - [Use Cases and Expected Outputs](#use-cases-and-expected-outputs)
   - [Troubleshooting Tips and Common Issues](#troubleshooting-tips-and-common-issues)
   - [FAQ](#faq)
 
@@ -75,6 +74,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
 - **Error Handling**: Robust error handling mechanisms to capture and log errors.
 - **Version Control**: Saves and updates code versions with detailed logs.
 - **Interactive Menu**: Provides an interactive menu for suggesting new features, analyzing code, generating documentation, and more.
+- **Input Check**: Checks user input and tests if clarification and more context are needed to ensure comprehensive understanding and accurate processing.
 
 ## User Guide
 
@@ -117,6 +117,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
   - `LoadProjectStatus`: Loads the project status from a specified path. Part of the 'LoadStatus' parameter set.
   - `LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
   - `NORAG`: Disables the RAG (Retrieve and Generate) functionality.
+  - `NOUserInputCheck`: Disables the input check.
 
 #### Environment Variables
 
@@ -305,6 +306,14 @@ Ensure these environment variables are set before running the script to enable t
 
       **Description**: This example generates a text summary of recent project activities using the specified LLM provider, in this case, "ollama". The `-Stream $false` parameter disables live streaming of the output.
 
+15. **Run Script Without User Input Check**:
+
+    ```powershell
+    "Cleaning folders where is file 'clean.it'" | AIPSTeam.ps1 -NOUserInputCheck
+    ```
+
+    **Description**: This example runs the script without performing any user input checks. The `-NOUserInputCheck` parameter disables the input validation functions.
+
 ## Developer Notes
 
 ### Code Structure
@@ -337,24 +346,6 @@ Ensure these environment variables are set before running the script to enable t
   - `PSAOAI`
   - `PSScriptAnalyzer`
   - `PowerHTML`
-
-## Use Cases and Expected Outputs
-
-1. **Monitor RAM Usage**:
-
-   ```powershell
-   "Monitor RAM usage and show a single color block based on the load." | AIPSTeam.ps1
-   ```
-
-   **Expected Output**: Discussion flow with Powershell code to monitor RAM usage with color block.
-
-2. **Monitor CPU Usage**:
-
-   ```powershell
-   "Monitor CPU usage and display dynamic graph." | AIPSTeam.ps1
-   ```
-
-   **Expected Output**: Discussion flow with Powershell code to show a dynamic graph showing CPU usage.
 
 ## Troubleshooting Tips and Common Issues
 
