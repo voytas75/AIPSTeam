@@ -4,15 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.7.1] - 2024.07.26 unpublished
+## [3.7.2] - 2024.07.27 unpublished
+
+## [3.7.1] - 2024.07.27
 
 - Minor fixes and code formatting improvements.
 - Added information message.
 - Improve cleaning function.
 - Fix passing of maxtokens value.
 - Added new function `Test-NeedForMoreInfo` to assess if additional information is required for processing.
-- Removed excess [System.] references. (thx https://github.com/NathanWindisch)
-- Removed excess parameters in Mandatory flag. (thx https://github.com/NathanWindisch)
+- Removed excess `[System.]` references. (thx <https://github.com/NathanWindisch>)
+- Removed excess parameters in Mandatory flag. (thx <https://github.com/NathanWindisch>)
+- Logo change.
 
 ## [3.6.1] - 2024.07.25
 
