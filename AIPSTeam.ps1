@@ -3545,7 +3545,6 @@ if (-not $GlobalState.NOLog) {
 }
 
 #region NeedForMoreInfoTest
-
 if (-not $NOUserInputCheck) {
     # Verbose message indicating the start of the need for more information test
     Write-Verbose "Starting the Test-NeedForMoreInfo function to evaluate user input."
@@ -3568,9 +3567,10 @@ if (-not $NOUserInputCheck) {
             Write-Host "|  6. Success Criteria: Define the criteria that will be used to measure the success of the project."
             Write-Host "|  7. Additional Context: Provide any other relevant information or context that could help the AI Agents Team understand the project better."
 
-            Write-Host ">> Please provide more details in your description and context."
-            Write-Host ">> (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)"
-            $additionalInput = Read-Host ">> "
+            Write-Host ">> Please provide more details in your description and context." -ForegroundColor DarkBlue
+            Write-Host ">> (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)" -ForegroundColor DarkBlue
+            Write-Host ">>" -NoNewline -ForegroundColor DarkBlue
+            $additionalInput = Read-Host " "
 
             # Provide detailed information about the elements that must be included in the description for the AI Agents Team to create a comprehensive PowerShell project.
 
