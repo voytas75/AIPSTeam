@@ -4,10 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.7.2] - 2024.07.27 unpublished
+## [3.8.2] - 2024.07.29  unpublished
+
+
+## [3.8.1] - 2024.07.28
 
 - Improved user prompts for input.
 - Add parameter `NOUserInputCheck`.
+- Documentation file info ([#11](https://github.com/voytas75/AIPSTeam/issues/11)).
 
 ## [3.7.1] - 2024.07.27
 

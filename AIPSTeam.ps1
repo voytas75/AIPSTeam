@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.7.2
+.VERSION 3.8.2
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG,powerHTML
@@ -74,7 +74,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.7.2
+Version: 3.8.2
 Author: voytas75
 Creation Date: 05.2024
 
@@ -127,7 +127,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.7.2"
+$AIPSTeamVersion = "3.8.2"
 
 #region ProjectTeamClass
 <#
@@ -3545,7 +3545,7 @@ if (-not $GlobalState.NOLog) {
 }
 
 #region NeedForMoreInfoTest
-if (-not $NOUserInputCheck) {
+if (-not $NOUserInputCheck -and -not $LoadProjectStatus) {
     # Verbose message indicating the start of the need for more information test
     Write-Verbose "Starting the Test-NeedForMoreInfo function to evaluate user input."
 
@@ -3767,7 +3767,11 @@ do {
     Write-Host "3. Analyze PSScriptAnalyzer only"
     Write-Host "4. Explain the code"
     Write-Host "5. Ask a specific question about the code"
-    Write-Host "6. Generate documentation"
+    if (Test-Path -Path $DocumentationFullName) {
+        Write-Host "6. Generate documentation (Documentation file exists: '$DocumentationFullName')"
+    } else {
+        Write-Host "6. Generate documentation"
+    }
     Write-Host "7. Show the code with research"
     Write-Host "8. Save Project State"
     Write-Host "9. Code Refactoring Suggestions"
