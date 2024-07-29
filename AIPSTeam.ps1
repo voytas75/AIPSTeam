@@ -3769,7 +3769,8 @@ do {
     Write-Host "5. Ask a specific question about the code"
     if (Test-Path -Path $DocumentationFullName) {
         Write-Host "6. Generate documentation (Documentation file exists: '$DocumentationFullName')"
-    } else {
+    }
+    else {
         Write-Host "6. Generate documentation"
     }
     Write-Host "7. Show the code with research"
@@ -3793,24 +3794,29 @@ do {
                 # Option 1: Suggest a new feature, enhancement, or change
                 Show-Header -HeaderText "Suggest a new feature, enhancement, or change"
                 do {
-                    $userChanges = Read-Host -Prompt "Suggest a new feature, enhancement, or change for the code."
+                    $userChanges = Read-Host -Prompt "Suggest a new feature, enhancement, or change for the code (press Enter to go back to the main menu)."
+                    if (-not $userChanges) {
+                        break
+                    }
                     if (-not $userChanges) {
                         Write-Host "-- You did not write anything. Please provide a suggestion."
                     }
                 } while (-not $userChanges)
                 
-                $promptMessage = "Based on the user's suggestion, incorporate a feature, enhancement, or change into the code. Show the next version of the code."
-                $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastPSDevCode
-                $MenuPrompt_ += "`nYou need to show all the code."
-                $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($MenuPrompt_)
-                #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
-                Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
-                Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
-                $theCode = Export-AndWritePowerShellCodeBlocks -InputString $powerShellDeveloperResponce -StartDelimiter '```powershell' -EndDelimiter '```'
-                if ($theCode) {
-                    $theCode | Out-File -FilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -Append -Encoding UTF8
-                    $GlobalState.FileVersion += 1
-                    $GlobalState.lastPSDevCode = $theCode
+                if ($userChanges) {
+                    $promptMessage = "Based on the user's suggestion, incorporate a feature, enhancement, or change into the code. Show the next version of the code."
+                    $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastPSDevCode
+                    $MenuPrompt_ += "`nYou need to show all the code."
+                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($MenuPrompt_)
+                    #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
+                    Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
+                    Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
+                    $theCode = Export-AndWritePowerShellCodeBlocks -InputString $powerShellDeveloperResponce -StartDelimiter '```powershell' -EndDelimiter '```'
+                    if ($theCode) {
+                        $theCode | Out-File -FilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -Append -Encoding UTF8
+                        $GlobalState.FileVersion += 1
+                        $GlobalState.lastPSDevCode = $theCode
+                    }
                 }
             }
             '2' {
@@ -3826,19 +3832,25 @@ do {
                 catch {
                     Write-Error "An error occurred while PSScriptAnalyzer: $_"
                 }
-                if ($issues) {
-                    foreach ($issue in $issues) {
-                        $issueText += $issue.message + " (line: $($issue.Line); rule: $($issue.Rulename))`n"
+                $modifyCode = Read-Host -Prompt "Do you want to modify the code? (Y/N)"
+                if ($modifyCode -eq 'Y') {
+                    if ($issues) {
+                        foreach ($issue in $issues) {
+                            $issueText += $issue.message + " (line: $($issue.Line); rule: $($issue.Rulename))`n"
+                        }
+                        $promptMessage = "Your task is to address issues found in PSScriptAnalyzer report."
+                        $promptMessage += "`n`nPSScriptAnalyzer report, issues:`n``````text`n$issueText`n```````n`n"
+                        $promptMessage += "The code:`n``````powershell`n" + $GlobalState.lastPSDevCode + "`n```````n`nShow the new version of the Powershell code with solved issues."
+                        $issues = ""
+                        $issueText = ""
+                        $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage)
+                        $GlobalPSDevResponse += $powerShellDeveloperResponce
+                        Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
+                        $theCode = Export-AndWritePowerShellCodeBlocks -InputString $($powerShellDeveloper.GetLastMemory().Response) -StartDelimiter '```powershell' -EndDelimiter '```'
                     }
-                    $promptMessage = "Your task is to address issues found in PSScriptAnalyzer report."
-                    $promptMessage += "`n`nPSScriptAnalyzer report, issues:`n``````text`n$issueText`n```````n`n"
-                    $promptMessage += "The code:`n``````powershell`n" + $GlobalState.lastPSDevCode + "`n```````n`nShow the new version of the Powershell code with solved issues."
-                    $issues = ""
-                    $issueText = ""
-                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage)
-                    $GlobalPSDevResponse += $powerShellDeveloperResponce
-                    Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
-                    $theCode = Export-AndWritePowerShellCodeBlocks -InputString $($powerShellDeveloper.GetLastMemory().Response) -StartDelimiter '```powershell' -EndDelimiter '```'
+                    else {
+                        break
+                    }
                     if ($theCode) {
                         $theCode | Out-File -FilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -Append -Encoding UTF8
                         $GlobalState.FileVersion += 1
@@ -3865,8 +3877,8 @@ do {
             '4' {
                 # Option 4: Explain the code
                 Show-Header -HeaderText "Explain the code"
-                $promptMessage = "Explain the code only.`n`n"
-                $promptMessage += "The code:`n``````powershell`n" + $GlobalState.lastPSDevCode + "`n```````n"
+                $promptMessage = "Please provide a detailed explanation of the following PowerShell code.`n`n"
+                $promptMessage += "Here is the code to be explained:`n````````powershell`n" + $GlobalState.lastPSDevCode + "`n`````````n"
                 try {
                     $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage)
                     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
@@ -3881,7 +3893,10 @@ do {
                 # Option 5: Ask a specific question about the code
                 Show-Header -HeaderText "Ask a specific question about the code"
                 try {
-                    $userChanges = Read-Host -Prompt "Ask a specific question about the code to seek clarification."
+                    $userChanges = Read-Host -Prompt "Ask a specific question about the code to seek clarification. (Press Enter to return to the main menu)"
+                    if ([string]::IsNullOrWhiteSpace($userChanges)) {
+                        break
+                    }
                     $promptMessage = "Based on the user's question for the code, provide only the answer."
                     if (Test-Path $DocumentationFullName) {
                         $promptMessage += " The documentation:`n````````text`n$(get-content -path $DocumentationFullName -raw)`n`````````n`n"
