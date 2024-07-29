@@ -326,6 +326,13 @@ Ensure these environment variables are set before running the script to enable t
 
     **Description**: This example runs the script without requiring any user interaction throughout the session. The `-NOInteraction` parameter ensures that the script will not prompt the user for any input or display any menus.
 
+17. **Work on User's Code**:
+
+    ```powershell
+    AIPSTeam.ps1 -TheCodePath "C:\UserScripts\script.ps1"
+    ```
+
+    **Description**: This example works on the user's provided PowerShell script located at `C:\UserScripts\script.ps1`. The `-TheCodePath` parameter specifies the path to the user code that the AI team will enhance. If interactive mode is not disabled, the user can provide additional instructions during the session, such as "adding additional logging functionality".
 
 ## Developer Notes
 
