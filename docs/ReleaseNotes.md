@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 - Implemented logic to return to the root menu ([#10](https://github.com/voytas75/AIPSTeam/issues/10)).
 - Add non-interactive session ([#21](https://github.com/voytas75/AIPSTeam/issues/21)).
+- Add feature to work on user's code instead of description of project ([#12](https://github.com/voytas75/AIPSTeam/issues/12)).
 - Minor fixes and code formatting improvements.
 
 ## [3.8.1] - 2024.07.28
