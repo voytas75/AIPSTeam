@@ -76,6 +76,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
 - **Interactive Menu**: Provides an interactive menu for suggesting new features, analyzing code, generating documentation, and more. This menu can be disabled by enabling Non-Interactive Mode.
 - **Input Check**: Checks user input and tests if clarification and more context are needed to ensure comprehensive understanding and accurate processing.
 - **Non-Interactive Mode**: Disables all interaction functionality, allowing the script to run the entire team collaboration workflow without requiring any user input or displaying any menus during the session.
+- **User Code Support**: Allows the team to work directly on user-provided PowerShell code instead of just a project description, enhancing the ability to debug, optimize, and extend existing scripts.
 
 ## User Guide
 
@@ -120,6 +121,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
   - `NORAG`: Disables the RAG (Retrieve and Generate) functionality.
   - `NOUserInputCheck`: Disables the input check.
   - `NOInteraction`: Disable the interaction.
+  - `TheCodePath`: Specifies the path to the user code to be processed by the AI Team.
 
 #### Environment Variables
 
