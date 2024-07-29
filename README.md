@@ -73,7 +73,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
 - **State Management**: Manages global state across different stages of the project.
 - **Error Handling**: Robust error handling mechanisms to capture and log errors.
 - **Version Control**: Saves and updates code versions with detailed logs.
-- **Interactive Menu**: Provides an interactive menu for suggesting new features, analyzing code, generating documentation, and more.
+- **Interactive Menu**: Provides an interactive menu for suggesting new features, analyzing code, generating documentation, and more. This menu can be disabled by enabling Non-Interactive Mode.
 - **Input Check**: Checks user input and tests if clarification and more context are needed to ensure comprehensive understanding and accurate processing.
 - **Non-Interactive Mode**: Disables all interaction functionality, allowing the script to run the entire team collaboration workflow without requiring any user input or displaying any menus during the session.
 
