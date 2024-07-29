@@ -41,6 +41,9 @@ Disables tips.
 .PARAMETER NOUserInputCheck
 Disables input check.
 
+.PARAMETER NOInteraction
+Disables user interaction throughout the session. No questions, no menu.
+
 .PARAMETER VerbosePrompt
 Shows prompts.
 
