@@ -3676,7 +3676,6 @@ $($($GlobalState.userInput).trim())
     if (-not $GlobalState.NOTips) {
         $powerShellDeveloperPrompt += "`n`nNote: There is `$50 tip for this task."
     }
-    <#
     $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($powerShellDeveloperPrompt)
 
     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
@@ -3754,9 +3753,7 @@ $($($GlobalState.userInput).trim())
         Add-ToGlobalResponses $GlobalState $projectManagerResponse
     }
     #endregion PM Project report
-#>
 }
-
 
 #region Menu
 # Define the menu prompt message
@@ -4114,15 +4111,17 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
 #region Final code
 if (-not $GlobalState.NOLog) {
     # Log Developer last memory
-    $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.PS1"
-    $GlobalState.lastPSDevCode | Out-File -FilePath $TheFinalCodeFullName
-    #Export-AndWritePowerShellCodeBlocks -InputString $(get-content $(join-path $GlobalState.TeamDiscussionDataFolder "TheCodeF.log") -raw) -OutputFilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode.ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
-    if (Test-Path -Path $TheFinalCodeFullName) {
-        # Call the function to check the code in 'TheCode.ps1' file
-        Write-Information "++ The final code was exported to $TheFinalCodeFullName" -InformationAction Continue
-        $issues = Invoke-CodeWithPSScriptAnalyzer -FilePath $TheFinalCodeFullName
-        if ($issues) {
-            write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
+    if ($GlobalState.lastPSDevCode) {
+        $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.PS1"
+        $GlobalState.lastPSDevCode | Out-File -FilePath $TheFinalCodeFullName
+        #Export-AndWritePowerShellCodeBlocks -InputString $(get-content $(join-path $GlobalState.TeamDiscussionDataFolder "TheCodeF.log") -raw) -OutputFilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode.ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
+        if (Test-Path -Path $TheFinalCodeFullName) {
+            # Call the function to check the code in 'TheCode.ps1' file
+            Write-Information "++ The final code was exported to $TheFinalCodeFullName" -InformationAction Continue
+            $issues = Invoke-CodeWithPSScriptAnalyzer -FilePath $TheFinalCodeFullName
+            if ($issues) {
+                write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
+            }
         }
     }
     foreach ($TeamMember in $Team) {
@@ -4146,7 +4145,7 @@ if ($ProjectfilePath) {
     Write-Host "++ You can resume working on this project at any time by loading the saved state. Just run:`nAIPSTeam.ps1 -LoadProjectStatus `"$ProjectfilePath`"`n`n"
 }
 
-Write-Host "Exiting..."
+Write-Host "Exiting...`n`n"
 
 # Ensure to reset the culture back to the original after the script execution
 [void](Register-EngineEvent PowerShell.Exiting -Action { [Threading.Thread]::CurrentThread.CurrentUICulture = $originalCulture })
