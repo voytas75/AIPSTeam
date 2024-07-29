@@ -4191,7 +4191,7 @@ if ($ProjectfilePath) {
     Write-Host "++ You can resume working on this project at any time by loading the saved state. Just run:`nAIPSTeam.ps1 -LoadProjectStatus `"$ProjectfilePath`"`n`n"
 }
 
-Write-Host "Exiting...`n`n"
+Write-Host "Exiting...`n"
 
 # Ensure to reset the culture back to the original after the script execution
 [void](Register-EngineEvent PowerShell.Exiting -Action { [Threading.Thread]::CurrentThread.CurrentUICulture = $originalCulture })
