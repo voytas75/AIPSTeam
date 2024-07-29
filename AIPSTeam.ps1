@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.8.2
+.VERSION 3.9.1
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG,powerHTML
@@ -74,7 +74,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.8.2
+Version: 3.9.1
 Author: voytas75
 Creation Date: 05.2024
 
@@ -108,6 +108,9 @@ param(
     [Parameter(HelpMessage = "Disables input check.")]
     [switch] $NOUserInputCheck,
 
+    [Parameter(HelpMessage = "Disables interaction functionality. There will be no menu after team collaboration workflow. The script will not ask the user any questions and will not require any interaction throughout the whole session.")]
+    [switch] $NOInteraction,
+
     [Parameter(HelpMessage = "Shows prompts.")]
     [switch] $VerbosePrompt,
 
@@ -127,7 +130,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.8.2"
+$AIPSTeamVersion = "3.9.1"
 
 #region ProjectTeamClass
 <#
@@ -3545,7 +3548,7 @@ if (-not $GlobalState.NOLog) {
 }
 
 #region NeedForMoreInfoTest
-if (-not $NOUserInputCheck -and -not $LoadProjectStatus) {
+if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction) {
     # Verbose message indicating the start of the need for more information test
     Write-Verbose "Starting the Test-NeedForMoreInfo function to evaluate user input."
 
@@ -3670,7 +3673,7 @@ $($($GlobalState.userInput).trim())
     if (-not $GlobalState.NOTips) {
         $powerShellDeveloperPrompt += "`n`nNote: There is `$50 tip for this task."
     }
-
+    <#
     $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($powerShellDeveloperPrompt)
 
     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
@@ -3680,7 +3683,6 @@ $($($GlobalState.userInput).trim())
     #endregion PM-PSDev
 
     #region RA-PSDev
-    #Invoke-ProcessFeedbackAndResponse -role $requirementsAnalyst -description $GlobalState.userInput -code $lastPSDevCode -tipAmount 100 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $GlobalState.TeamDiscussionDataFolder
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $powerShellDeveloper -GlobalState $GlobalState
     }
@@ -3749,15 +3751,17 @@ $($($GlobalState.userInput).trim())
         Add-ToGlobalResponses $GlobalState $projectManagerResponse
     }
     #endregion PM Project report
+#>
 }
-#region Menu
 
+
+#region Menu
 # Define the menu prompt message
 $MenuPrompt = "{0} The previous version of the code has been shared below after the feedback block.`n`n````````text`n{1}`n`````````n`nHere is previous version of the code:`n`n``````powershell`n{2}`n```````n`nThink step by step. Make sure your answer is unbiased."
 $MenuPromptNoUserChanges = "{0} The previous version of the code has been shared below. The code:`n`n``````powershell`n{1}`n```````n`nThink step by step. Make sure your answer is unbiased."
 
 # Start a loop to keep the menu running until the user chooses to quit
-do {
+while ($userOption -ne 'Q' -and -not $NOInteraction) {
     # Display the menu options
     Write-Output "`n`n"
     Show-Header -HeaderText "MENU"
@@ -4101,7 +4105,7 @@ do {
             }
         }
     }
-} while ($userOption -ne 'Q') # End the loop when the user chooses to quit
+} 
 #endregion Menu
 
 #region Final code

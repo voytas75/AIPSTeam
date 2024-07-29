@@ -75,6 +75,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
 - **Version Control**: Saves and updates code versions with detailed logs.
 - **Interactive Menu**: Provides an interactive menu for suggesting new features, analyzing code, generating documentation, and more.
 - **Input Check**: Checks user input and tests if clarification and more context are needed to ensure comprehensive understanding and accurate processing.
+- **Non-Interactive Mode**: Disables all interaction functionality, allowing the script to run the entire team collaboration workflow without requiring any user input or displaying any menus during the session.
 
 ## User Guide
 
@@ -118,6 +119,7 @@ By leveraging the Bing Web Search API, the AI PowerShell Team can provide enhanc
   - `LLMProvider`: Specifies the LLM provider to use (e.g., ollama, LMStudio, AzureOpenAI). Default is "AzureOpenAI".
   - `NORAG`: Disables the RAG (Retrieve and Generate) functionality.
   - `NOUserInputCheck`: Disables the input check.
+  - `NOInteraction`: Disable the interaction.
 
 #### Environment Variables
 
@@ -313,6 +315,15 @@ Ensure these environment variables are set before running the script to enable t
     ```
 
     **Description**: This example runs the script without performing any user input checks. The `-NOUserInputCheck` parameter disables the input validation functions.
+
+16. **Run Script with Disabled Interaction**:
+
+    ```powershell
+    "Generate a daily system health report." | AIPSTeam.ps1 -NOInteraction
+    ```
+
+    **Description**: This example runs the script without requiring any user interaction throughout the session. The `-NOInteraction` parameter ensures that the script will not prompt the user for any input or display any menus.
+
 
 ## Developer Notes
 
