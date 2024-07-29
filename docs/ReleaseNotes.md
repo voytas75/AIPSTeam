@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.9.2] - 2024.07.29 unpublished
+
+
 ## [3.9.1] - 2024.07.29
 
 - Implemented logic to return to the root menu ([#10](https://github.com/voytas75/AIPSTeam/issues/10)).
