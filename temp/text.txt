@@ -235,3 +235,16 @@ function Test-WriteHost
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $alias = (Get-Alias -Definition &#8220;Write-Host&#8221; -ErrorAction SilentlyContinue).Name
 &nbsp; 
+
+
+---------------
+
+add snippet to the team. parameter `-LoadCode` to load code without project. 
+idea is to improve the code, extend the code.
+for snippet therre will be key in globalstate.
+what to do with the code?
+code will be processed as userinput.
+
+we can make the snippet as user input extended with "improve, extend the code. this is the code: <code>"
+
+
