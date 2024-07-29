@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [3.8.2] - 2024.07.29  unpublished
 
+- Implemented logic to return to the root menu ([#10](https://github.com/voytas75/AIPSTeam/issues/10)).
 
 ## [3.8.1] - 2024.07.28
 
