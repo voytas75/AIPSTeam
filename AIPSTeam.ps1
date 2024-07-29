@@ -23,6 +23,9 @@ This script simulates a team of AI-powered Agents with RAG, each with a unique r
 .PARAMETER userInput 
 Defines the project outline as a string. This parameter can also accept input from the pipeline.
 
+.PARAMETER TheCodePath 
+Specifies the path to the user code to be processed by the AI Team.
+
 .PARAMETER Stream 
 Controls whether the output should be streamed live. The default is `$true`.
 
@@ -89,6 +92,9 @@ https://github.com/voytas75/AIPSTeam/
 param(
     [Parameter(ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string.")]
     [string] $userInput,
+
+    [Parameter(HelpMessage = "Specifies the path to the code file.")]
+    [string] $TheCodePath,    
 
     [Parameter(HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
     [bool] $Stream = $true,
@@ -2839,6 +2845,7 @@ Provide only the numerical score without any explanation or additional text.
         }
 
         Write-Verbose "Validating and parsing the response from the LLM."
+        
         # Validate and parse the response
         [double]$parsedValue = 0.00
         
@@ -2847,8 +2854,15 @@ Provide only the numerical score without any explanation or additional text.
         }
 
         Write-Verbose "Determining if more information is needed based on the response."
+        
         # Determine if more information is needed and return true or false
         $needMoreInfo = $parsedValue
+        
+        # Log the needMoreInfo value to the logfile
+        $logFilePath = Join-Path $script:GlobalState.TeamDiscussionDataFolder "needMoreInfo.log"
+        $logMessage = "needMoreInfo value: $needMoreInfo"
+        Add-Content -Path $logFilePath -Value $logMessage
+
         return $needMoreInfo -ge $positiveLimit
     }
     catch {
@@ -2893,6 +2907,7 @@ if (-not $LoadProjectStatus) {
         GlobalPSDevResponse      = @()
         OrgUserInput             = ""
         UserInput                = ""
+        UserCode                 = ""
         LogFolder                = ""
         MaxTokens                = $MaxTokens
         VerbosePrompt            = $VerbosePrompt
@@ -2912,6 +2927,24 @@ if (-not $LoadProjectStatus) {
 $env:PSAOAI_BANNER = "0"
 
 Show-Banner
+
+#region TheCode
+if (Test-Path -Path $TheCodePath) {
+    try {
+        $codeContent = Get-Content -Path $TheCodePath -ErrorAction Stop
+        $GlobalState.UserCode = $codeContent
+        Write-Host "++ Code loaded successfully from $TheCodePath"
+        $UserInput = "User is seeking assistance with a PowerShell script. The goal is to enhance, debug, or optimize the code. user's PowerShell code:`n``````powershell`n$($codeContent.trim())`n``````"
+    }
+    catch {
+        Write-Warning "-- Failed to load code from $TheCodePath. Error: $_"
+    }
+}
+else {
+    Write-Warning "-- The specified path $TheCodePath does not exist."
+}
+
+#endregion TheCode
 
 # Check if the UserInput parameter is not provided
 if (-not $UserInput) {
@@ -3557,12 +3590,22 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
 
     do {
         # Call the Test-NeedForMoreInfo function with the provided user input
-        $needMoreInfo = Test-NeedForMoreInfo -userInput $userInput
-
+        if (-not $GlobalState.UserCode) {
+            # If there is no user code, call the Test-NeedForMoreInfo function with the user input
+            $needMoreInfo = Test-NeedForMoreInfo -userInput $userInput
+        } else {
+            # If there is user code, set needMoreInfo to true
+            $needMoreInfo = $true
+        }
         # Add a message to inform the user about the status of the need for more information
-        if ($needMoreInfo) {
+        if ($needMoreInfo -or $GlobalState.UserCode) {
             Write-Host "-- Additional information is needed to fully understand or address the user's input."
-            Write-Host ">> User input: '$userInput'"
+            if (-not $GlobalState.UserCode) {
+                Write-Host ">> User input: '$userInput'"
+            }
+            else {
+                Write-Host ">> User provided code to work on."
+            }
 
             Write-Host "|  To ensure the AI Agents Team can create a comprehensive PowerShell project, please include the following elements in your description:"
             Write-Host "|  1. Project Objective: Clearly state the main goal or purpose of the project."
@@ -3574,7 +3617,7 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
             Write-Host "|  7. Additional Context: Provide any other relevant information or context that could help the AI Agents Team understand the project better."
 
             Write-Host ">> Please provide more details in your description and context." -ForegroundColor DarkBlue
-            Write-Host ">> (Type 'quit' to proceed with the current input or hit Enter to proceed with the current input as is)" -ForegroundColor DarkBlue
+            Write-Host ">> (Type 'quit' or hit Enter to proceed with the current input as is)" -ForegroundColor DarkBlue
             Write-Host ">>" -NoNewline -ForegroundColor DarkBlue
             $additionalInput = Read-Host " "
 
@@ -3585,8 +3628,11 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
                 Write-Host "++ Proceeding with the current input as is."
                 $needMoreInfo = $false
             }
-            elseif ($additionalInput) {
+            elseif ($additionalInput -and -not $GlobalState.UserCode) {
                 $userInput += " " + $additionalInput
+            }
+            elseif ($GlobalState.UserCode) {
+                $userInput += "`n" + $additionalInput
             }
             else {
                 Write-Host "++ No additional information provided. Using current input as is."
@@ -4117,7 +4163,7 @@ if (-not $GlobalState.NOLog) {
         #Export-AndWritePowerShellCodeBlocks -InputString $(get-content $(join-path $GlobalState.TeamDiscussionDataFolder "TheCodeF.log") -raw) -OutputFilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode.ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
         if (Test-Path -Path $TheFinalCodeFullName) {
             # Call the function to check the code in 'TheCode.ps1' file
-            Write-Information "++ The final code was exported to $TheFinalCodeFullName" -InformationAction Continue
+            Write-Information "++ The final code was exported to $TheFinalCodeFullName`n" -InformationAction Continue
             $issues = Invoke-CodeWithPSScriptAnalyzer -FilePath $TheFinalCodeFullName
             if ($issues) {
                 write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
