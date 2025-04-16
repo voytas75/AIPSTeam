@@ -763,7 +763,7 @@ function Show-Banner {
    AI PowerShell Team with RAG                            powered by PSAOAI Module
                                                                      Ollama
                                                                      LM Studio
-                                                                     AZURE Bing Web
+                                                                     Web Search
    https://github.com/voytas75/AIPSTeam
   
 '@
@@ -1311,52 +1311,6 @@ function Save-AndUpdateCode {
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
-}
-
-function Save-AndUpdateCode2 {
-    <#
-    .SYNOPSIS
-    Saves the updated code to a file and updates the last code and file version.
-
-    .DESCRIPTION
-    This function takes the response string, saves it to a file with a versioned filename, 
-    updates the last code content, increments the file version, and logs the saved file path.
-
-    .PARAMETER response
-    The response string containing the updated code to be saved.
-
-    .PARAMETER GlobalState
-    GlobalState
-
-    .EXAMPLE
-    Save-AndUpdateCode -response $response -lastCode ([ref]$lastCode) -fileVersion ([ref]$fileVersion) -teamDiscussionDataFolder "C:\TeamData"
-    #>
-
-    param (
-        [string] $response, # The updated code to be saved
-        [PSCustomObject] $GlobalState
-    )
-    try {
-        # Save the response to a versioned file
-        $_savedFile = Export-AndWritePowerShellCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
-    
-        if (Test-Path -Path $_savedFile) {
-            # Update the last code content with the saved file content
-            $GlobalState.lastPSDevCode = Get-Content -Path $_savedFile -Raw 
-            # Increment the file version number
-            $GlobalState.fileVersion += 1
-            # Log the saved file path for verbose output
-            Write-Verbose $_savedFile
-        }
-        else {
-            Write-Error "The file $_savedFile does not exist."
-        }
-    }
-    catch [System.Exception] {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-
 }
 
 function Invoke-AnalyzeCodeWithPSScriptAnalyzer {

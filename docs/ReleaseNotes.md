@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 - minor fixes.
 - improved user input handling logic
+- remove unused logic
 
 
 ## [3.9.1] - 2024.07.29
