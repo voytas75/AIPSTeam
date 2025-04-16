@@ -3037,7 +3037,7 @@ else {
     }
 }
 try {
-    $DocumentationFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "Documentation.txt" -ErrorAction Stop
+    $DocumentationFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "Documentation.md" -ErrorAction Stop
     $ProjectfilePath = Join-Path $GlobalState.TeamDiscussionDataFolder "Project.xml" -ErrorAction Stop
     Get-CheckForScriptUpdate -currentScriptVersion $AIPSTeamVersion -scriptName $scriptname
 }
@@ -3287,7 +3287,7 @@ $documentationSpecialist = [ProjectTeam]::new(
     "Documentator",
     $documentationSpecialistRole,
     @"
-You are an expert {0} focusing on PowerShell projects. Your role is to create comprehensive, clear, and user-friendly documentation that supports both end-users and developers. Your expertise ensures that PowerShell projects are well-documented, easily understood, and effectively utilized.
+You are an expert {0} focusing on PowerShell projects. Your role is to create comprehensive, clear, and user-friendly documentation that supports both end-users and developers. Must use advanced, plain Markdown style without block quotes. Your expertise ensures that PowerShell projects are well-documented, easily understood, and effectively utilized.
 
 When creating documentation for a PowerShell project, you must produce the following:
 

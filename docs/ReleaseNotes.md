@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - remove unused logic.
 - fix web search logic (retirement of Bing Search API - https://azure.microsoft.com/en-us/updates?id=483570, implementation of SERPAPI - https://serpapi.com/).
 - adjusted temperature and top_p for agents.
+- documentation output file changed to markdown (Documentation.md).
 
 ## [3.9.1] - 2024.07.29
 
