@@ -2047,172 +2047,57 @@ function Invoke-BingWebSearch {
     }
 }
 
-function Remove-StringDirtyData {
+function Invoke-SerpApiGoogleSearch {
+    <#
+    .SYNOPSIS
+        Performs a Google Search using SerpApi and returns the JSON results.
+
+    .PARAMETER Query
+        The search query string.
+
+    .PARAMETER ApiKey
+        Your SerpApi API key.
+
+    .PARAMETER Num
+        Number of results to fetch (optional, default: 10).
+
+    .EXAMPLE
+        Invoke-SerpApiGoogleSearch -Query "PowerShell web scraping" -ApiKey "YOUR_API_KEY"
+    #>
+    [CmdletBinding()]
     param (
-        [string]$inputString
+        [Parameter(Mandatory=$true)]
+        [string]$Query,
+
+        [Parameter(Mandatory=$true)]
+        [string]$ApiKey,
+
+        [Parameter(Mandatory=$false)]
+        [int]$Num = 10
     )
 
-    Write-Verbose "Starting to clean the input string."
-
-    # Remove leading and trailing whitespace
-    Write-Verbose "Removing leading and trailing whitespace."
-    $cleanedString = $inputString.Trim()
-
-    # Remove multiple spaces and replace with a single space
-    Write-Verbose "Replacing multiple spaces with a single space."
-    $cleanedString = $cleanedString -replace '\s+', ' '
-
-    # Remove any non-printable characters
-    Write-Verbose "Removing non-printable characters."
-    $cleanedString = $cleanedString -replace '[^\x20-\x7E]', ''
-
-    # Remove &nbsp; entities
-    Write-Verbose "Removing &nbsp; entities."
-    $cleanedString = $cleanedString -replace '&nbsp;', ' '
-
-    # Remove HTML tags
-    Write-Verbose "Removing HTML tags."
-    $cleanedString = $cleanedString -replace '<[^>]*>', ''
-
-    # Decode HTML entities
-    Write-Verbose "Decoding HTML entities."
-    $cleanedString = [System.Web.HttpUtility]::HtmlDecode($cleanedString)
- 
-    # Remove URLs (optional)
-    Write-Verbose "Removing URLs."
-    $cleanedString = $cleanedString -replace 'http[s]?://\S+', ''
-
-    # Remove empty lines
-    Write-Verbose "Removing empty lines."
-    $cleanedString = $cleanedString -replace '^\s*$\n', ''
-
-    # Convert the string to an array of lines
-    Write-Verbose "Converting the string to an array of lines."
-    $lines = $cleanedString -split "`n"
-
-    # Remove empty lines
-    Write-Verbose "Removing empty lines from the array of lines."
-    $lines = $lines | Where-Object { $_.Trim() -ne "" }
-
-    # Join the lines back into a single string
-    Write-Verbose "Joining the lines back into a single string."
-    $cleanedString = $lines -join "`n"
-
-    #region Cleaning RAG Raw Data
-    # This section is responsible for cleaning raw data obtained from RAG (Retrieve and Generate) processes.
-    # The goal is to ensure that the text is free from artifacts, irregular spacing, and formatting issues
-    # that may have resulted from HTML removal or other preprocessing steps.
-    # The cleaned text should be readable, well-formatted, and maintain its original structure and meaning.
-    # The cleaning process involves removing HTML entities, excessive blank lines, and other artifacts,
-    # as well as correcting spacing issues, standardizing quotation marks, and ensuring proper capitalization.
-    # The cleaned text is then processed by an LLM (Language Learning Model) to further refine and ensure
-    # the quality of the output.
-    #endregion Cleaning RAG Raw Data
-    Write-Host "++ Cleaning RAG Raw Data: Ensuring the text is free from artifacts, irregular spacing, and formatting issues." -ForegroundColor Cyan
-    
-    # Define the LLM system prompt for cleaning the string
-    $LLMSystemPrompt = @"
-You are an expert text processor specializing in cleaning and formatting web content. Your task is to process text that originally came from HTML but has already had its HTML tags removed. The text still contains artifacts, irregular spacing, meta content, sidebar content or formatting issues from the HTML removal process. Your goal is to produce clean, readable text.
-
-In your processing you must:
-
-1. Remove all HTML entities (e.g., &nbsp;, &amp;, &#39;) and replace them with their corresponding characters. Use a comprehensive list of HTML entities for reference.
-
-2. Normalize line breaks:
-   - Reduce multiple consecutive blank lines to a single blank line for paragraph separation.
-   - Preserve intentional line breaks for structured content like addresses, poetry, or code snippets.
-   - Remove unnecessary line breaks within paragraphs, joining split sentences.
-
-3. Clean up HTML artifacts:
-   - Remove any remaining HTML tags, including partial or malformed tags.
-   - Eliminate stray brackets, braces, or other syntax-related characters that don't belong in plain text.
-
-4. Standardize spacing:
-   - Ensure single spaces after punctuation marks (periods, commas, colons, etc.).
-   - Remove extra spaces between words.
-   - Eliminate leading or trailing spaces on each line.
-
-5. Normalize quotation marks and apostrophes:
-   - Use straight quotes (' and ") consistently throughout the text.
-   - Ensure apostrophes are used correctly for contractions and possessives.
-
-6. Correct capitalization:
-   - Capitalize the first letter of each sentence.
-   - Preserve intentional capitalization for proper nouns, acronyms, and titles.
-
-7. Remove redundancies:
-   - Eliminate repeated words or phrases that likely resulted from improper tag removal or formatting issues.
-   - Be cautious not to remove intentional repetition for emphasis or stylistic purposes.
-
-8. Format lists consistently:
-   - Identify and standardize bulleted and numbered lists.
-   - Ensure consistent indentation and formatting for list items.
-   - Convert HTML list structures to plain text equivalents if necessary.
-
-9. Correct spelling and encoding errors:
-   - Fix obvious spelling mistakes, especially those resulting from character encoding issues.
-   - Be cautious with proper nouns or specialized terminology.
-
-10. Standardize punctuation:
-    - Use consistent em-dashes, en-dashes, and hyphens.
-    - Ensure correct usage of semicolons, colons, and other punctuation marks.
-
-11. Preserve or convert special formatting:
-    - Maintain emphasis (bold, italic) using plain text conventions (e.g., *asterisks* or _underscores_) if appropriate for the output format.
-    - Convert simple tables to a readable plain text format if encountered.
-
-12. Handle URLs and email addresses:
-    - Ensure hyperlinks are visible and properly formatted in plain text.
-    - Preserve the integrity of email addresses and web URLs.
-
-13. Normalize number and date formats:
-    - Standardize numerical representations (e.g., consistent use of commas or periods for thousands separators).
-    - Use a consistent date format throughout the document.
-
-14. Remove or replace non-printable characters:
-    - Eliminate null characters, form feeds, and other control characters.
-    - Replace tabs with appropriate spacing.
-
-15. Final consistency check:
-    - Ensure overall consistency in formatting choices throughout the document.
-    - Verify that the cleaning process hasn't introduced new errors or inconsistencies.
-"@
-
-    # Define the user prompt with the input string
-    $LLMUserPrompt = @"
-Web content:
-
-``````text
-$cleanedString
-``````
-
-Present the cleaned text only, maintaining its original structure and meaning as much as possible.
-"@
-
-    # Invoke the LLM to clean the string
-    try {
-        Write-Verbose "Invoking LLM to clean the string."
-
-        # Invoke the LLMChatCompletion function with the necessary parameters
-        $CleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider `
-            -SystemPrompt $LLMSystemPrompt `
-            -UserPrompt $LLMUserPrompt `
-            -Temperature 0.1 `
-            -TopP 0.1 `
-            -MaxTokens $GlobalState.MaxTokens `
-            -Stream $false `
-            -LogFolder $GlobalState.TeamDiscussionDataFolder `
-            -DeploymentChat $script:DeploymentChat `
-            -ollamaModel $script:ollamaModel
-
-        Write-Host "++ Cleaning RAG Raw Data: Finished." -ForegroundColor Cyan
-        return $CleanedString
+    $baseUrl = "https://serpapi.com/search"
+    $params = @{
+        engine = "google"
+        q      = $Query
+        api_key = $ApiKey
+        num    = $Num
     }
-    catch {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
-        Write-Host "-- An error occurred while invoking the LLM to clean the string." -ForegroundColor DarkYellow
-        return
+
+    # Build query string (compatible with PowerShell 5+)
+    if ($PSVersionTable.PSVersion.Major -lt 5) {
+        $queryString = ($params.Keys | Sort-Object | ForEach-Object { "$_=" + [uri]::EscapeDataString($params[$_]) }) -join "&"
+    } else {
+        $queryString = ($params.Keys | Sort-Object | ForEach-Object { "$_=" + [uri]::EscapeDataString($params[$_]) }) -join "&"
+    }
+    $url = "${baseUrl}?${queryString}"
+
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Get
+        return $response.organic_results
+    } catch {
+        Write-Error "SerpApi request failed: $_"
+        return $null
     }
 }
 
@@ -2230,7 +2115,7 @@ function Invoke-RAG {
 
         # Define the system prompt for the RAG agent
         $RAGSystemPrompt = @"
-You are a Web Search Query Manager. Your task is to suggest the best query for the Azure Bing Web Search API based on the user's input. To create an effective query, summarize the given text and follow these best practices:
+You are a Web Search Query Manager. Your task is to suggest the best query for the Web Search based on the user's input. To create an effective query, summarize the given text and follow these best practices:
 
 1. Use specific keywords: Choose concise and precise terms that clearly define the search intent to increase result relevance.
 2. Utilize advanced operators: Leverage operators like 'AND', 'OR', and 'NOT' to refine queries. Use 'site:' for domain-specific searches.
@@ -2269,18 +2154,21 @@ $($userInput.trim())
 
             try {
                 # Define the log file path for storing the query
-                $LogFilePath = Join-Path -Path $GlobalState.TeamDiscussionDataFolder -ChildPath "azurebingqueries.log"
+                $LogFilePath = Join-Path -Path $GlobalState.TeamDiscussionDataFolder -ChildPath "websearchqueries.log"
                 Write-Verbose "Log file path defined: $LogFilePath"
 
                 # Append the shortened user input to the log file with a date prefix in professional log style
                 $DatePrefix = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-                $LogEntry = "$DatePrefix - Query: $ShortenedUserInput"
+                $LogEntry = "$DatePrefix - Query: '$ShortenedUserInput'"
                 Add-Content -Path $LogFilePath -Value $LogEntry
-                Write-Verbose "Log entry added: $LogEntry"
+                Write-Verbose "Log entry added: '$LogEntry'"
 
                 # Perform the web search using the shortened user input
-                $WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User")) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"))
-                Write-Verbose "Web search performed with query: $ShortenedUserInput"
+                #$WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User")) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"))
+                $WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
+                Write-Verbose "Web search performed with query: '$ShortenedUserInput'"
+                Write-Host "++ Status: Web search completed successfully." -ForegroundColor Green
+                Write-Verbose "Web results: $($WebResultsSerpApi | ConvertTo-Json -Depth 10)"
             }
             catch {
                 Write-Error "Error occurred during web search or logging: $_"
@@ -2293,14 +2181,15 @@ $($userInput.trim())
             throw "The query is empty. Unable to perform web search."
         }
 
+        $webResults = $WebResultsSerpApi
         # Check if web results are returned
-        if ($WebResults) {
+        if ($webResults) {
             Write-Verbose "Web results returned. Extracting and cleaning text content."
 
             try {
                 # Extract and clean text content from the web results
                 $WebResultsText = ($WebResults | ForEach-Object {
-                        $HtmlContent = Invoke-WebRequest -Uri $_.url
+                        $HtmlContent = Invoke-WebRequest -Uri $_.link
                         $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
                         $TextContent
                     }
@@ -2836,6 +2725,7 @@ $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
 
 # Check if the PSAOAI module version is at least 0.3.2
 $minVersion = [version]"0.3.2"
+$scriptname = "AIPSTeam"
 if ( Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion $minVersion ) {
     # Import the PSAOAI module forcefully
     [void](Import-module -name PSAOAI -Force)
@@ -3046,7 +2936,6 @@ if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
 }
 #endregion LMStudio
 
-$scriptname = "AIPSTeam"
 if ($LoadProjectStatus) {
     # Check if the provided path is a directory
     if (Test-Path -Path $LoadProjectStatus -PathType Container) {
@@ -3828,7 +3717,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
     Write-Host "4. Explain the code"
     Write-Host "5. Ask a specific question about the code"
     if (Test-Path -Path $DocumentationFullName) {
-        Write-Host "6. Generate documentation (Documentation file exists: '$DocumentationFullName')"
+        Write-Host "6. Re-generate documentation (Documentation file exists: '$DocumentationFullName')"
     }
     else {
         Write-Host "6. Generate documentation"

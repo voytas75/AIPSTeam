@@ -7,9 +7,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 ## [3.10.1] - 2025.04.16 unpublished
 
 - minor fixes.
-- improved user input handling logic
-- remove unused logic
-
+- improved user input handling logic.
+- remove unused logic.
+- fix web search logic (retirement of Bing Search API - https://azure.microsoft.com/en-us/updates?id=483570, implementation of SERPAPI).
+- 
 
 ## [3.9.1] - 2024.07.29
 
