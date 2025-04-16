@@ -1,8 +1,8 @@
 <#PSScriptInfo
-.VERSION 3.9.2
+.VERSION 3.10.1
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
-.TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG,powerHTML
+.TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,serpapi,RAG,powerHTML
 .PROJECTURI https://github.com/voytas75/AIPSTeam
 .ICONURI https://raw.githubusercontent.com/voytas75/AIPSTeam/master/images/AIPSTeam_logo.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PSScriptAnalyzer, PowerHTML
