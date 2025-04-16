@@ -24,7 +24,7 @@ This script simulates a team of AI-powered Agents with RAG, each with a unique r
 Defines the project outline as a string. This parameter can also accept input from the pipeline.
 
 .PARAMETER TheCodePath 
-Specifies the path to the user code to be processed by the AI Team.
+Specifies the file path (absolute) to a PowerShell script that you want the AI Team to analyze, enhance, or debug. If provided, the script will load and process the contents of this file.
 
 .PARAMETER Stream 
 Controls whether the output should be streamed live. The default is `$true`.
@@ -93,7 +93,7 @@ param(
     [Parameter(ValueFromPipeline = $true, HelpMessage = "Defines the project outline as a string.")]
     [string] $userInput,
 
-    [Parameter(HelpMessage = "Specifies the path to the code file.")]
+    [Parameter(HelpMessage = "Specifies the file path (absolute) to a PowerShell script that you want the AI Team to analyze, enhance, or debug. If provided, the script will load and process the contents of this file.")]
     [string] $TheCodePath,    
 
     [Parameter(HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
@@ -2949,6 +2949,8 @@ if ($TheCodePath) {
     else {
         Write-Warning "-- The specified path $TheCodePath does not exist."
     }
+} else {
+    Write-Warning "-- The specified path $TheCodePath does not exist."
 }
 
 #endregion TheCode
