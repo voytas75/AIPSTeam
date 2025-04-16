@@ -2212,7 +2212,7 @@ Please analyze the following text through the lens of this description: '$userin
 
 Text to analyze:
 ````````text
-$($(Remove-StringDirtyData -inputString $webResultsText).trim())
+$($webResultsText)
 ````````
 
 Provide your analysis in the following format:
