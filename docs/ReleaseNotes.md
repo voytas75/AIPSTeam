@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - improved user input handling logic.
 - remove unused logic.
 - fix web search logic (retirement of Bing Search API - https://azure.microsoft.com/en-us/updates?id=483570, implementation of SERPAPI).
-- 
+- adjusted temperature and top_p for agents.
 
 ## [3.9.1] - 2024.07.29
 
