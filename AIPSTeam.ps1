@@ -2939,18 +2939,18 @@ if ($TheCodePath) {
         try {
             $codeContent = Get-Content -Path $TheCodePath -ErrorAction Stop
             $GlobalState.UserCode = $codeContent
-            Write-Host "++ Code loaded successfully from $TheCodePath"
+            Write-Host "++ Code loaded successfully from '$TheCodePath'"
             $UserInput = "User is seeking assistance with a PowerShell script. The goal is to enhance, debug, or optimize the code. user's PowerShell code:`n``````powershell`n$($codeContent.trim())`n``````"
         }
         catch {
-            Write-Warning "-- Failed to load code from $TheCodePath. Error: $_"
+            Write-Warning "-- Failed to load code from '$TheCodePath'. Error: $_"
         }
     }
     else {
-        Write-Warning "-- The specified path $TheCodePath does not exist."
+        Write-Warning "-- The specified path '$TheCodePath' does not exist."
     }
 } else {
-    Write-Warning "-- The specified path $TheCodePath does not exist."
+    Write-Host "++ TIP: If you want to analyze an existing PowerShell script, please provide a path to a PowerShell script using the '-TheCodePath' parameter."
 }
 
 #endregion TheCode
@@ -2959,7 +2959,9 @@ if ($TheCodePath) {
 if (-not $UserInput) {
     if (-not $LoadProjectStatus) {
         # Prompt the user to enter the PowerShell project description
-        $UserInput = Read-Host "Please enter the PowerShell project description"
+        Write-Host ">> Please enter the PowerShell project description" -ForegroundColor DarkBlue
+        Write-Host ">>" -NoNewline -ForegroundColor DarkBlue
+        $UserInput = Read-Host " "
         # Store the user input in the GlobalState object
         $GlobalState.UserInput = $UserInput
     }
@@ -3633,20 +3635,55 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
             # Provide detailed information about the elements that must be included in the description for the AI Agents Team to create a comprehensive PowerShell project.
 
             # Check if the user wants to quit providing additional input
+            # ----------------------------------------------------------------------------------------------------------
+            # Add additional information to the user's input if it is empty or if the user provided code to work on.
+            # ----------------------------------------------------------------------------------------------------------
+            # if ($additionalInput -in @('q', "Q", "quit")) {
+            #     Write-Verbose "User chose to proceed with current input as is."
+            #     $needMoreInfo = $false
+            # }
+            # elseif ($additionalInput -and -not $GlobalState.UserCode) {
+            #     Write-Verbose "Adding user-provided additional information to original input."
+            #     $userInput += " " + $additionalInput
+            # }
+            # elseif ($GlobalState.UserCode) {
+            #     Write-Verbose "Adding user-provided additional information to the user-provided code."
+            #     $userInput += "`n" + $additionalInput
+            #     $needMoreInfo = $false
+            #     Write-Host "++ Proceeding with additional information."
+            # }
+            # else {
+            #     Write-Verbose "No additional information provided. Proceeding with current input as is."
+            #     $needMoreInfo = $false
+            #     Write-Host "++ Proceeding with current input as is."
+            # }
+            Write-Verbose "User provided $($additionalInput.Length) characters of additional information: '$additionalInput'"
+            if (-not $additionalInput) {
+                Write-Verbose "No additional information provided."
+            } else {
+                Write-Verbose "Additional information provided."
+            }
+
             if ($additionalInput -in @('q', "Q", "quit")) {
-                Write-Host "++ Proceeding with the current input as is."
+                Write-Verbose "User chose to proceed with current input as is."
                 $needMoreInfo = $false
             }
-            elseif ($additionalInput -and -not $GlobalState.UserCode) {
-                $userInput += " " + $additionalInput
-            }
-            elseif ($GlobalState.UserCode) {
-                $userInput += "`n" + $additionalInput
+            elseif ($additionalInput) {
+                if ($GlobalState.UserCode) {
+                    Write-Verbose "Adding user-provided additional information to the user-provided code."
+                    $userInput += "`n" + $additionalInput
+                    $needMoreInfo = $false
+                    Write-Host "++ Proceeding with additional information."
+                } else {
+                    Write-Verbose "Adding user-provided additional information to original input."
+                    $userInput += " " + $additionalInput
+                }
             }
             else {
-                Write-Host "++ No additional information provided. Using current input as is."
+                Write-Verbose "No additional information provided. Proceeding with current input as is."
                 $needMoreInfo = $false
-            }
+                Write-Host "++ Proceeding with current input as is."
+            }            
         }
         else {
             Write-Host "++ No additional information is needed; the user's input is clear and complete."
