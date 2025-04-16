@@ -2165,6 +2165,11 @@ $($userInput.trim())
 
                 # Perform the web search using the shortened user input
                 #$WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User")) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"))
+                if (-not [System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) {
+                    $SerpApiKey = Read-Host "Please enter your SerpApi key and press Enter"
+                    [System.Environment]::SetEnvironmentVariable('SERPAPI_API_KEY', $SerpApiKey, 'User')
+                }
+                
                 $WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
                 Write-Verbose "Web search performed with query: '$ShortenedUserInput'"
                 Write-Host "++ Status: Web search completed successfully." -ForegroundColor Green
