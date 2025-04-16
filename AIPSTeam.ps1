@@ -139,7 +139,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.9.2"
+$AIPSTeamVersion = "3.10.1"
 
 #region ProjectTeamClass
 <#
