@@ -3076,8 +3076,8 @@ Format your response as follows:
 
 Ensure your guidelines provide a solid foundation for the PowerShell developer to create an efficient, robust, and maintainable script.
 "@ -f $requirementsAnalystRole,
-    0.6,
-    0.9,
+    0.3,
+    0.85,
     $GlobalState
 )
 
@@ -3120,8 +3120,8 @@ When providing insights:
 
 Your goal is to guide PowerShell Developers in creating robust, efficient, and domain-compliant solutions that meet the specific needs of the enterprise IT environment.
 "@ -f $domainExpertRole,
-    0.65,
-    0.9,
+    0.25,
+    0.85,
     $GlobalState
 )
 
@@ -3179,7 +3179,7 @@ When presenting your architecture:
 
 Your goal is to create a robust, efficient, and future-proof architecture that serves as a solid foundation for PowerShell Developers to build upon.
 "@ -f $systemArchitectRole,
-    0.7,
+    0.5,
     0.85,
     $GlobalState
 )
@@ -3201,8 +3201,8 @@ Cite any PowerShell cmdlets or techniques you use that are specific to version 5
 
 Before finalizing your response, please review your code to ensure it meets all requirements and follows PowerShell best practices.
 "@ -f $powerShellDeveloperRole,
-    0.65,
-    0.8,
+    0.3,
+    0.7,
     $GlobalState
 )
 
@@ -3268,8 +3268,8 @@ When presenting your findings:
 
 Your goal is to ensure that the PowerShell program is robust, reliable, and ready for deployment, meeting the highest standards of quality and performance.
 "@ -f $qaEngineerRole,
-    0.6,
-    0.9,
+    0.2,
+    0.8,
     $GlobalState
 )
 
@@ -3336,8 +3336,8 @@ When creating documentation:
 
 Your goal is to create documentation that enhances the usability and understanding of the PowerShell project, making it accessible to users of varying skill levels and providing developers with the information they need to maintain and extend the project.
 "@ -f $documentationSpecialistRole,
-    0.6,
-    0.8,
+    0.25,
+    0.75,
     $GlobalState
 )
 
@@ -3407,8 +3407,8 @@ When creating the project report:
 
 Your goal is to provide a comprehensive, accurate, and insightful overview of the PowerShell project, demonstrating its value to stakeholders and providing a clear picture of the project's execution and outcomes.
 "@ -f $projectManagerRole,
-    0.7,
-    0.85,
+    0.4,
+    0.8,
     $GlobalState
 )
 #endregion ProjectTeam
