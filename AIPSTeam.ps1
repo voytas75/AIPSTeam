@@ -2959,9 +2959,11 @@ if ($TheCodePath) {
 if (-not $UserInput) {
     if (-not $LoadProjectStatus) {
         # Prompt the user to enter the PowerShell project description
-        Write-Host ">> Please enter the PowerShell project description" -ForegroundColor DarkBlue
-        Write-Host ">>" -NoNewline -ForegroundColor DarkBlue
-        $UserInput = Read-Host " "
+        while (-not $UserInput) {
+            Write-Host ">> Please enter the PowerShell project description" -ForegroundColor DarkBlue
+            Write-Host ">>" -NoNewline -ForegroundColor DarkBlue
+            $UserInput = Read-Host " "
+        }
         # Store the user input in the GlobalState object
         $GlobalState.UserInput = $UserInput
     }
@@ -3672,17 +3674,20 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
                 if ($GlobalState.UserCode) {
                     Write-Verbose "Adding user-provided additional information to the user-provided code."
                     $userInput += "`n" + $additionalInput
+                    $GlobalState.UserInput = $userInput
                     $needMoreInfo = $false
                     Write-Host "++ Proceeding with additional information."
                 } else {
                     Write-Verbose "Adding user-provided additional information to original input."
                     $userInput += " " + $additionalInput
+                    $GlobalState.UserInput = $userInput
                 }
             }
             else {
                 Write-Verbose "No additional information provided. Proceeding with current input as is."
                 $needMoreInfo = $false
                 Write-Host "++ Proceeding with current input as is."
+                Write-Host "++ User input: $($GlobalState.UserInput)"
             }            
         }
         else {
