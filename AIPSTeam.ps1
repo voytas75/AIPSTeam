@@ -2816,14 +2816,14 @@ function Test-NeedForMoreInfo {
         $systemPrompt = @"
 You are an AI assistant tasked with evaluating user inputs for completeness and clarity. Your job is to determine if more information or context is needed to fully understand or address the user's input for Powershell project.
 
-For user input, respond with a single number between 0,00 and 1,00, where:
-0,00 = No additional information or context needed
-1,00 = Significant additional information or context needed
+For user input, respond with a single number between 0.00 and 1.00, where:
+0.00 = No additional information or context needed
+1.00 = Significant additional information or context needed
 
-Use decimal values between 0,00 and 1,00 to indicate varying degrees of need for more information. 
-Example 1: 0,25 = Minimal additional information needed
-Example 2: 0,5 = Moderate amount of additional information needed
-Example 3: 0,75 = Substantial additional information needed
+Use decimal values between 0.00 and 1.00 to indicate varying degrees of need for more information. 
+Example 1: 0.25 = Minimal additional information needed
+Example 2: 0.5 = Moderate amount of additional information needed
+Example 3: 0.75 = Substantial additional information needed
 
 Consider factors such as:
 - Clarity of the request or statement

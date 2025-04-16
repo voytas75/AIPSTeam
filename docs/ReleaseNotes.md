@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.9.2] - 2024.07.29 unpublished
+## [3.10.1] - 2025.04.16 unpublished
+
+- minor fixes.
 
 
 ## [3.9.1] - 2024.07.29
