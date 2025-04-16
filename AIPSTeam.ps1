@@ -2814,24 +2814,24 @@ function Test-NeedForMoreInfo {
         Write-Verbose "Defining the system prompt and user prompt for the LLM."
         # Define the system prompt and user prompt for the LLM
         $systemPrompt = @"
-You are an AI assistant tasked with evaluating user inputs for completeness and clarity. Your job is to determine if more information or context is needed to fully understand or address the user's input for Powershell project.
+You are an AI assistant evaluating user inputs related to a PowerShell project. Your task is to assess each input for clarity and completeness, and to determine how much additional information or context is required to fully understand or respond to it.
 
-For user input, respond with a single number between 0.00 and 1.00, where:
-0.00 = No additional information or context needed
-1.00 = Significant additional information or context needed
+Respond with a single decimal number between 0.00 and 1.00, where:
+- 0.00 = Fully clear and complete (no additional information needed)
+- 1.00 = Very unclear or incomplete (significant additional information needed)
+- Use values in between to reflect the degree of incompleteness:
+    - 0.25 = Minor clarification needed
+    - 0.50 = Moderate additional information needed
+    - 0.75 = Substantial clarification or context missing
 
-Use decimal values between 0.00 and 1.00 to indicate varying degrees of need for more information. 
-Example 1: 0.25 = Minimal additional information needed
-Example 2: 0.5 = Moderate amount of additional information needed
-Example 3: 0.75 = Substantial additional information needed
-
-Consider factors such as:
-- Clarity of the request or statement
+Evaluation criteria:
+- Clarity of the user's request
 - Specificity of the information provided
-- Presence of ambiguous terms or concepts
-- Completeness of the context
+- Presence of ambiguous terms or phrasing
+- Sufficiency of context to act on the request
 
-Provide only the numerical score without any explanation or additional text.
+Output format:
+Return only the numerical score (e.g., 0.50). Do not include explanations or comments.
 "@
         $userPrompt = "User input: $userInput"
 
@@ -2839,7 +2839,7 @@ Provide only the numerical score without any explanation or additional text.
         # Send the prompt to the LLM
         #$response = Invoke-LLMChatCompletion -Provider "AzureOpenAI" -SystemPrompt $systemPrompt -UserPrompt $userPrompt -Temperature 0.7 -TopP 1.0 -MaxTokens 50 -Stream $false -LogFolder "C:\Logs" -DeploymentChat "default"
         [string]$response = (Invoke-LLMChatCompletion -Provider $script:GlobalState.LLMProvider -SystemPrompt $systemPrompt -UserPrompt $userPrompt -Temperature 0.7 -TopP 1 -MaxTokens 10 -Stream $false -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel).trim()
-        Write-Verbose "LLM Response: '$response'"
+        Write-Verbose "LLM Response for 'Test-NeedForMoreInfo': '$response'"
         if ($response -match '\.') {
             $response = $response -replace '\.', ','
         }
@@ -2881,13 +2881,14 @@ $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
 [void]([Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US'))
 
 # Check if the PSAOAI module version is at least 0.3.2
-if ( Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
+$minVersion = [version]"0.3.2"
+if ( Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion $minVersion ) {
     # Import the PSAOAI module forcefully
     [void](Import-module -name PSAOAI -Force)
 }
 else {
     # Display a warning message if the required module version is not installed
-    Write-Warning "-- You need to install/update PSAOAI module version >= 0.3.2. Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
+    Write-Warning "-- You need to install/update PSAOAI module version >= $($minVersion). Use: 'Install-Module PSAOAI' or 'Update-Module PSAOAI'"
     return
 }
 
@@ -3614,7 +3615,7 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
         if ($needMoreInfo -or $GlobalState.UserCode) {
             Write-Host "-- Additional information is needed to fully understand or address the user's input."
             if (-not $GlobalState.UserCode) {
-                Write-Host ">> User input: '$userInput'"
+                Write-Host ">> User input: '$($GlobalState.UserCode)'"
             }
             else {
                 Write-Host ">> User provided code to work on."
