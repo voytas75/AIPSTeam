@@ -2907,7 +2907,7 @@ if (-not $LoadProjectStatus) {
         LastPSDevCode            = ""
         GlobalPSDevResponse      = @()
         OrgUserInput             = ""
-        UserInput                = ""
+        UserInput                = $userInput
         UserCode                 = ""
         LogFolder                = ""
         MaxTokens                = $MaxTokens
@@ -3615,7 +3615,7 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
         if ($needMoreInfo -or $GlobalState.UserCode) {
             Write-Host "-- Additional information is needed to fully understand or address the user's input."
             if (-not $GlobalState.UserCode) {
-                Write-Host ">> User input: '$($GlobalState.UserCode)'"
+                Write-Host ">> User input: '$($GlobalState.UserInput)'"
             }
             else {
                 Write-Host ">> User provided code to work on."
