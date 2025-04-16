@@ -2929,19 +2929,26 @@ $env:PSAOAI_BANNER = "0"
 Show-Banner
 
 #region TheCode
-if (Test-Path -Path $TheCodePath) {
-    try {
-        $codeContent = Get-Content -Path $TheCodePath -ErrorAction Stop
-        $GlobalState.UserCode = $codeContent
-        Write-Host "++ Code loaded successfully from $TheCodePath"
-        $UserInput = "User is seeking assistance with a PowerShell script. The goal is to enhance, debug, or optimize the code. user's PowerShell code:`n``````powershell`n$($codeContent.trim())`n``````"
+
+# Load user code from file if TheCodePath parameter is provided
+# Description: This block checks if the user provided a path to a PowerShell script using the TheCodePath parameter. 
+# If the file exists, it loads the code into the $GlobalState.UserCode variable and updates the user input prompt to 
+# mention that the user is seeking assistance with a PowerShell script.
+if ($TheCodePath) {
+    if (Test-Path -Path $TheCodePath) {
+        try {
+            $codeContent = Get-Content -Path $TheCodePath -ErrorAction Stop
+            $GlobalState.UserCode = $codeContent
+            Write-Host "++ Code loaded successfully from $TheCodePath"
+            $UserInput = "User is seeking assistance with a PowerShell script. The goal is to enhance, debug, or optimize the code. user's PowerShell code:`n``````powershell`n$($codeContent.trim())`n``````"
+        }
+        catch {
+            Write-Warning "-- Failed to load code from $TheCodePath. Error: $_"
+        }
     }
-    catch {
-        Write-Warning "-- Failed to load code from $TheCodePath. Error: $_"
+    else {
+        Write-Warning "-- The specified path $TheCodePath does not exist."
     }
-}
-else {
-    Write-Warning "-- The specified path $TheCodePath does not exist."
 }
 
 #endregion TheCode
