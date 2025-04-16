@@ -3660,6 +3660,10 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
             #     $needMoreInfo = $false
             #     Write-Host "++ Proceeding with current input as is."
             # }
+
+            # Clean the additional input variable
+            $additionalInput = $additionalInput.Trim()
+
             Write-Verbose "User provided $($additionalInput.Length) characters of additional information: '$additionalInput'"
             if (-not $additionalInput) {
                 Write-Verbose "No additional information provided."
