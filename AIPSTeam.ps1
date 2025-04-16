@@ -2194,6 +2194,8 @@ $($userInput.trim())
                         $TextContent
                     }
                 ) -join "`n`n"
+                $WebResultsText = ($WebResultsText -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
+
                 Write-Verbose "Text content extracted and cleaned from web results."
             }
             catch {
@@ -3350,7 +3352,6 @@ When summarizing a PowerShell project, you must:
 
 1. Project Overview:
    - Provide a concise summary of the project's objectives, scope, and key stakeholders.
-   - Outline the project timeline, including start date, major milestones, and completion date.
 
 2. Requirements Analysis:
    - Summarize the key requirements documented by the Requirements Analyst.
