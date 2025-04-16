@@ -763,7 +763,7 @@ function Show-Banner {
    AI PowerShell Team with RAG                            powered by PSAOAI Module
                                                                      Ollama
                                                                      LM Studio
-                                                                     Web Search
+                                                                     Web Search (https://serpapi.com/)
    https://github.com/voytas75/AIPSTeam
   
 '@
@@ -771,7 +771,7 @@ function Show-Banner {
         This PowerShell script simulates a team of AI Agents working together on a PowerShell project. Each Agent has a 
         unique role and contributes to the project in a sequential manner. The script processes user input, performs 
         various tasks, and generates outputs such as code, documentation, and analysis reports. The application utilizes 
-        Retrieval-Augmented Generation (RAG) to enhance its power and leverage Azure OpenAI, Ollama, or LM Studio to generate the output.
+        Retrieval-Augmented Generation (RAG) with web search to enhance its power. 
          
 '@ -ForegroundColor Blue
   
@@ -2085,8 +2085,8 @@ function Invoke-SerpApiGoogleSearch {
     }
 
     # Build query string (compatible with PowerShell 5+)
-    if ($PSVersionTable.PSVersion.Major -lt 5) {
-        $queryString = ($params.Keys | Sort-Object | ForEach-Object { "$_=" + [uri]::EscapeDataString($params[$_]) }) -join "&"
+    if ($PSVersionTable.PSVersion.Major -gt 5) {
+        $queryString = ($params.Keys | Sort-Object | ForEach-Object { "$_=" + [uri]::EscapeDataString($params[$_]) }) | Join-String "&"
     } else {
         $queryString = ($params.Keys | Sort-Object | ForEach-Object { "$_=" + [uri]::EscapeDataString($params[$_]) }) -join "&"
     }
@@ -2979,7 +2979,11 @@ if ($LoadProjectStatus) {
         Write-Host "Some values of the imported project:"
         Write-Host "Team Discussion Data Folder: $($GlobalState.TeamDiscussionDataFolder)"
         Write-Host "Last file Version: $($($GlobalState.FileVersion) - 1)"
-        Write-Host "User Input: $($GlobalState.OrgUserInput)"
+        $orgUserInput = $GlobalState.OrgUserInput
+        if ($orgUserInput.Length -gt 50) {
+            $orgUserInput = $orgUserInput.Substring(0, 50) + "... (full length: $($orgUserInput.Length) characters)"
+        }
+        Write-Host "User Input: $orgUserInput"
         Write-Host "Log Folder: $($GlobalState.LogFolder)"
         Write-Host "No Tips: $($GlobalState.NOTips)"
         Write-Host "No Log: $($GlobalState.NOLog)"
