@@ -3671,32 +3671,6 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
             Write-Host ">>" -NoNewline -ForegroundColor DarkBlue
             $additionalInput = Read-Host " "
 
-            # Provide detailed information about the elements that must be included in the description for the AI Agents Team to create a comprehensive PowerShell project.
-
-            # Check if the user wants to quit providing additional input
-            # ----------------------------------------------------------------------------------------------------------
-            # Add additional information to the user's input if it is empty or if the user provided code to work on.
-            # ----------------------------------------------------------------------------------------------------------
-            # if ($additionalInput -in @('q', "Q", "quit")) {
-            #     Write-Verbose "User chose to proceed with current input as is."
-            #     $needMoreInfo = $false
-            # }
-            # elseif ($additionalInput -and -not $GlobalState.UserCode) {
-            #     Write-Verbose "Adding user-provided additional information to original input."
-            #     $userInput += " " + $additionalInput
-            # }
-            # elseif ($GlobalState.UserCode) {
-            #     Write-Verbose "Adding user-provided additional information to the user-provided code."
-            #     $userInput += "`n" + $additionalInput
-            #     $needMoreInfo = $false
-            #     Write-Host "++ Proceeding with additional information."
-            # }
-            # else {
-            #     Write-Verbose "No additional information provided. Proceeding with current input as is."
-            #     $needMoreInfo = $false
-            #     Write-Host "++ Proceeding with current input as is."
-            # }
-
             # Clean the additional input variable
             $additionalInput = $additionalInput.Trim()
 
@@ -3748,12 +3722,11 @@ $RAGpromptAddon = $null
 if ($GlobalState.RAG -and (-not $LoadProjectStatus)) {
     $RAGSummarizePrompt = @"
 You are an expert in Retrieval-Augmented Generation (RAG) and text analysis. Your role is to process and analyze text inputs, extracting key information relevant to a given context. Your tasks include:
-
 1. Cleaning the input text by removing advertising elements, menus, and other non-essential content.
 2. Analyzing the cleaned text in relation to a specific user-provided description or context.
 3. Extracting and summarizing key information, insights, and generating relevant questions.
 
-Your output should be concise, relevant, and insightful, focusing on the most important aspects of the text in relation to the given context.
+Your response MUST be concise, relevant, and insightful, focusing on the most important aspects of the text in relation to the given context.
 "@
     $RAGresponse = Invoke-RAG -userInput $userInput -prompt $RAGSummarizePrompt -RAGAgent $projectManager
     if ($RAGresponse) {
