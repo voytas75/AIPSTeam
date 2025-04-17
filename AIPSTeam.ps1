@@ -2130,8 +2130,6 @@ function Invoke-SearchExa {
         return $null
     }
 }
-
-
 function Invoke-RAG {
     param (
         [string]$UserInput,
