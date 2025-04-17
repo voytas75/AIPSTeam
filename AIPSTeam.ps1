@@ -763,7 +763,9 @@ function Show-Banner {
    AI PowerShell Team with RAG                            powered by PSAOAI Module
                                                                      Ollama
                                                                      LM Studio
-                                                                     Web Search (https://serpapi.com/)
+                                                                     Web Search:
+                                                                        https://serpapi.com/
+                                                                        https://exa.ai/
    https://github.com/voytas75/AIPSTeam
   
 '@
@@ -3800,7 +3802,8 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
     Write-Output ""
 
     # Process the user's choice if it's not 'Q' or '9' (both of which mean 'quit')
-    if ($userOption -ne 'Q') {
+    $userOption = $userOption.Trim()
+    if ($userOption -ne 'Q' -and $userOption -ne 'q') {
         switch ($userOption) {
             '1' {
                 # Option 1: Suggest a new feature, enhancement, or change
