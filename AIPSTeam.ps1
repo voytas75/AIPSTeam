@@ -2233,7 +2233,24 @@ $($userInput.trim())
                     Write-Verbose "Extracting and cleaning text content from SERPAPI web results."
                     # Extract and clean text content from the web results SERPAPI
                     $WebResultsTextSerpApi = ($WebResultsSerpApi | ForEach-Object {
-                            $HtmlContent = Invoke-WebRequest -Uri $_.link
+                            #$HtmlContent = Invoke-WebRequest -Uri $_.link
+                            $maxRetries = 3
+                            $retry = 0
+                            do {
+                                try {
+                                    $HtmlContent = Invoke-WebRequest -Uri $_.link -TimeoutSec 10 -ErrorAction Stop
+                                    $success = $true
+                                }
+                                catch {
+                                    $retry++
+                                    Start-Sleep -Seconds 2
+                                    $success = $false
+                                    if ($retry -ge $maxRetries) {
+                                        Write-Warning "Giving up on $($_.link) after $maxRetries attempts."
+                                        continue
+                                    }
+                                }
+                            } until ($success -or $retry -ge $maxRetries)
                             $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
                             $TextContent
                         }
@@ -2245,7 +2262,24 @@ $($userInput.trim())
                     Write-Verbose "Extracting and cleaning text content from EXA web results."
                     # Extract and clean text content from the web results EXA
                     $WebResultsTextExa = ($WebResultsExa | ForEach-Object {
-                            $HtmlContent = Invoke-WebRequest -Uri $_.url
+                            #$HtmlContent = Invoke-WebRequest -Uri $_.url
+                            $maxRetries = 3
+                            $retry = 0
+                            do {
+                                try {
+                                    $HtmlContent = Invoke-WebRequest -Uri $_.url -TimeoutSec 10 -ErrorAction Stop
+                                    $success = $true
+                                }
+                                catch {
+                                    $retry++
+                                    Start-Sleep -Seconds 2
+                                    $success = $false
+                                    if ($retry -ge $maxRetries) {
+                                        Write-Warning "Giving up on $($_.url) after $maxRetries attempts."
+                                        continue
+                                    }
+                                }
+                            } until ($success -or $retry -ge $maxRetries)
                             $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
                             $TextContent
                         }) -join "`n`n"
