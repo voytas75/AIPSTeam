@@ -2070,28 +2070,29 @@ function Invoke-SerpApiGoogleSearch {
     #>
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$Query,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$ApiKey,
 
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [int]$Num = 10
     )
 
     $baseUrl = "https://serpapi.com/search"
     $params = @{
-        engine = "google"
-        q      = $Query
+        engine  = "google"
+        q       = $Query
         api_key = $ApiKey
-        num    = $Num
+        num     = $Num
     }
 
     # Build query string (compatible with PowerShell 5+)
     if ($PSVersionTable.PSVersion.Major -gt 5) {
         $queryString = ($params.Keys | Sort-Object | ForEach-Object { "$_=" + [uri]::EscapeDataString($params[$_]) }) | Join-String "&"
-    } else {
+    }
+    else {
         $queryString = ($params.Keys | Sort-Object | ForEach-Object { "$_=" + [uri]::EscapeDataString($params[$_]) }) -join "&"
     }
     $url = "${baseUrl}?${queryString}"
@@ -2099,7 +2100,8 @@ function Invoke-SerpApiGoogleSearch {
     try {
         $response = Invoke-RestMethod -Uri $url -Method Get
         return $response.organic_results
-    } catch {
+    }
+    catch {
         Write-Error "SerpApi request failed: $_"
         return $null
     }
@@ -2114,20 +2116,21 @@ function Invoke-SearchExa {
     )
     $url = "https://api.exa.ai/search"
     $headers = @{
-        "content-type" = "application/json"
+        "content-type"  = "application/json"
         "Authorization" = "Bearer $BearerToken"
     }
     $body = @{
-        "query" = $Query
+        "query"    = $Query
         "contents" = @{
-            "text" = $true
+            "text"       = $true
             "numResults" = $NumResults
         }
     } | ConvertTo-Json
     try {
         $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Post -Body $body
         return $response.results
-    } catch {
+    }
+    catch {
         Write-Error "Exa search failed: $_"
         return $null
     }
@@ -2142,17 +2145,18 @@ function Invoke-Serper {
     )
     $url = "https://google.serper.dev/search"
     $headers = @{
-        "X-API-KEY" = $ApiKey
+        "X-API-KEY"    = $ApiKey
         "Content-Type" = "application/json"
     }
     $body = [pscustomobject]@{
-        q = $Query
+        q   = $Query
         num = $NumResults
     } | ConvertTo-Json
     try {
         $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body
         return $response | ConvertTo-Json
-    } catch {
+    }
+    catch {
         Write-Error "Serper search failed: $_"
         return $null
     }
@@ -2979,7 +2983,8 @@ if ($TheCodePath) {
     else {
         Write-Warning "-- The specified path '$TheCodePath' does not exist."
     }
-} else {
+}
+else {
     Write-Host "++ TIP: If you want to analyze an existing PowerShell script, please provide a path to a PowerShell script using the '-TheCodePath' parameter."
 }
 
@@ -3637,7 +3642,8 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
         if (-not $GlobalState.UserCode) {
             # If there is no user code, call the Test-NeedForMoreInfo function with the user input
             $needMoreInfo = Test-NeedForMoreInfo -userInput $userInput
-        } else {
+        }
+        else {
             # If there is user code, set needMoreInfo to true
             $needMoreInfo = $true
         }
@@ -3697,7 +3703,8 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
             Write-Verbose "User provided $($additionalInput.Length) characters of additional information: '$additionalInput'"
             if (-not $additionalInput) {
                 Write-Verbose "No additional information provided."
-            } else {
+            }
+            else {
                 Write-Verbose "Additional information provided."
             }
 
@@ -3712,7 +3719,8 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
                     $GlobalState.UserInput = $userInput
                     $needMoreInfo = $false
                     Write-Host "++ Proceeding with additional information."
-                } else {
+                }
+                else {
                     Write-Verbose "Adding user-provided additional information to original input."
                     $userInput += " " + $additionalInput
                     $GlobalState.UserInput = $userInput
