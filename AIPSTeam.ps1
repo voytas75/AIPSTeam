@@ -839,7 +839,6 @@ function Export-AndWritePowerShellCodeBlocks {
     return $false
 }
 
-
 function Invoke-CodeWithPSScriptAnalyzer {
     param(
         [Parameter()]
@@ -1077,8 +1076,8 @@ function Get-CyclomaticComplexity {
     $complexityData | Sort-Object -Property Complexity -Descending | Format-Table -AutoSize
 }
 
-# Helper function to get complexity description
 function Get-ComplexityDescription {
+    # Helper function to get complexity description
     param (
         [int]$complexity
     )
@@ -1260,8 +1259,9 @@ function Update-GlobalStateWithResponse {
     }
 }
 
-# Refactor Invoke-ProcessFeedbackAndResponse to use the new functions
+
 function Invoke-ProcessFeedbackAndResponse {
+    # Refactor Invoke-ProcessFeedbackAndResponse to use the new functions
     param (
         [Parameter(Mandatory)]
         [object]$Reviewer,
@@ -1300,8 +1300,9 @@ function Invoke-ProcessFeedbackAndResponse {
     }
 }
 
-# Refactor Save-AndUpdateCode to use the new function
+
 function Save-AndUpdateCode {
+    # Refactor Save-AndUpdateCode to use the new function
     param (
         [string] $response,
         [PSCustomObject] $GlobalState
@@ -2157,7 +2158,6 @@ function Invoke-Serper {
     }
 }
 
-
 function Invoke-RAG {
     param (
         [string]$UserInput,
@@ -2698,6 +2698,7 @@ function Start-OllamaModel {
         Write-Host "-- Failed to retrieve model information from /api/tags: $_"
     }
 }
+
 function Test-OllamaInstalled {
     <#
     .SYNOPSIS
