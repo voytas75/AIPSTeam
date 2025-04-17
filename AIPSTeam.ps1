@@ -2130,6 +2130,31 @@ function Invoke-SearchExa {
         return $null
     }
 }
+
+function Invoke-Serper {
+    [CmdletBinding()]
+    param (
+        [string]$Query,
+        [string]$ApiKey
+    )
+    $url = "https://google.serper.dev/search"
+    $headers = @{
+        "X-API-KEY" = $ApiKey
+        "Content-Type" = "application/json"
+    }
+    $body = [pscustomobject]@{
+        q = $Query
+    } | ConvertTo-Json
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body
+        return $response | ConvertTo-Json
+    } catch {
+        Write-Error "Serper search failed: $_"
+        return $null
+    }
+}
+
+
 function Invoke-RAG {
     param (
         [string]$UserInput,
@@ -2202,13 +2227,43 @@ $($userInput.trim())
                     $ExaApiKey = Read-Host "Please enter your Exa.ai key and press Enter"
                     [System.Environment]::SetEnvironmentVariable('EXA_API_KEY', $ExaApiKey, 'User')
                 }
+                if (-not [System.Environment]::GetEnvironmentVariable("SERPER_API_KEY", "User")) {
+                    $SerperApiKey = Read-Host "Please enter your Serper key and press Enter"
+                    [System.Environment]::SetEnvironmentVariable('SERPER_API_KEY', $SerperApiKey, 'User')
+                }
                 
-                $WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
-                $WebResultsExa = Invoke-SearchExa -Query $ShortenedUserInput -BearerToken ([System.Environment]::GetEnvironmentVariable("EXA_API_KEY", "User")) -NumResults $MaxCount
+                try {
+                    $WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
+                    if ($WebResultsSerpApi.Count -eq 0) {
+                        throw "No data returned from SerpApi"
+                    }
+                }
+                catch {
+                    try {
+                        $WebResultsExa = Invoke-SearchExa -Query $ShortenedUserInput -BearerToken ([System.Environment]::GetEnvironmentVariable("EXA_API_KEY", "User")) -NumResults $MaxCount
+                        if ($WebResultsExa.Count -eq 0) {
+                            throw "No data returned from EXA"
+                        }
+                    }
+                    catch {
+                        try {
+                            $WebResultsSerper = Invoke-Serper -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPER_API_KEY", "User")) -Num $MaxCount
+                            if ($WebResultsSerper.Count -eq 0) {
+                                throw "No data returned from Serper"
+                            }
+                        }
+                        catch {
+                            Write-Error "No web results returned from all providers."
+                            throw $_
+                        }
+                    }
+                }
+
                 Write-Verbose "Web search performed with query: '$ShortenedUserInput'"
                 Write-Host "++ Status: Web search completed successfully." -ForegroundColor Green
-                Write-Verbose "Web results: $($WebResultsSerpApi | ConvertTo-Json -Depth 10)"
-                Write-Verbose "Web results: $($WebResultsExa | ConvertTo-Json -Depth 10)"
+                Write-Verbose "Web results WebResultsSerpApi: $($WebResultsSerpApi | ConvertTo-Json -Depth 10)"
+                Write-Verbose "Web results WebResultsExa: $($WebResultsExa | ConvertTo-Json -Depth 10)"
+                Write-Verbose "Web results WebResultsSerper: $($WebResultsSerper | ConvertTo-Json -Depth 10)"
             }
             catch {
                 Write-Error "Error occurred during web search or logging: $_"
@@ -2221,7 +2276,7 @@ $($userInput.trim())
             throw "The query is empty. Unable to perform web search."
         }
 
-        $webResults = $WebResultsSerpApi + $WebResultsExa
+        $webResults = $WebResultsSerpApi + $WebResultsExa + $WebResultsSerper
         # Check if web results are returned
         if ($webResults) {
             Write-Verbose "Web results returned. Extracting and cleaning text content."
@@ -2284,8 +2339,37 @@ $($userInput.trim())
                     Write-Verbose "Text content extracted and cleaned from EXA web results."
                     $WebResultsTextExa = ($WebResultsTextExa -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
                 }
-                if ($WebResultsTextSerpApi -or $WebResultsTextExa) {
-                    $WebResultsText = $WebResultsTextSerpApi + "`n`n" + $WebResultsTextExa
+                if ($WebResultsSerper) {
+                    Write-Verbose "Extracting and cleaning text content from Serper web results."
+                    # Extract and clean text content from the web results Serper
+                    $WebResultsTextSerper = ($WebResultsSerper | ForEach-Object {
+                            #$HtmlContent = Invoke-WebRequest -Uri $_.url
+                            $maxRetries = 3
+                            $retry = 0
+                            do {
+                                try {
+                                    $HtmlContent = Invoke-WebRequest -Uri $_.url -TimeoutSec 10 -ErrorAction Stop
+                                    $success = $true
+                                }
+                                catch {
+                                    $retry++
+                                    Start-Sleep -Seconds 2
+                                    $success = $false
+                                    if ($retry -ge $maxRetries) {
+                                        Write-Warning "Giving up on $($_.url) after $maxRetries attempts."
+                                        continue
+                                    }
+                                }
+                            } until ($success -or $retry -ge $maxRetries)
+                            $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
+                            $TextContent
+                        }) -join "`n`n"
+                    Write-Verbose "Text content extracted and cleaned from Serper web results."
+                    $WebResultsTextSerper = ($WebResultsTextSerper -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
+                }
+
+                if ($WebResultsTextSerpApi -or $WebResultsTextExa -or $WebResultsTextSerper) {
+                    $WebResultsText = $WebResultsTextSerpApi + "`n`n" + $WebResultsTextExa + "`n`n" + $WebResultsTextSerper
                     Write-Verbose "Web results text combined."
                 }
             }
