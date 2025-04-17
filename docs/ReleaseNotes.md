@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - minor fixes.
 - added retry logic for web requests.
 - serper API integration (https://serper.dev/).
+- docs update.
 
 ## [3.10.1] - 2025.04.16
 
