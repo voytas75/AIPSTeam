@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [3.10.2] - 2025.04.16 unpublished
 
-
+- move check for script update to the beginning of the script.
 
 ## [3.10.1] - 2025.04.16
 

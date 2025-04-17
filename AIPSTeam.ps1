@@ -139,7 +139,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.10.1"
+$AIPSTeamVersion = "3.10.2"
 
 #region ProjectTeamClass
 <#
@@ -2780,6 +2780,8 @@ $env:PSAOAI_BANNER = "0"
 
 Show-Banner
 
+Get-CheckForScriptUpdate -currentScriptVersion $AIPSTeamVersion -scriptName $scriptname
+
 #region TheCode
 
 # Load user code from file if TheCodePath parameter is provided
@@ -3039,7 +3041,6 @@ else {
 try {
     $DocumentationFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "Documentation.md" -ErrorAction Stop
     $ProjectfilePath = Join-Path $GlobalState.TeamDiscussionDataFolder "Project.xml" -ErrorAction Stop
-    Get-CheckForScriptUpdate -currentScriptVersion $AIPSTeamVersion -scriptName $scriptname
 }
 catch [System.Exception] {
     # Handle any exceptions that occur during the path joining or script update check
