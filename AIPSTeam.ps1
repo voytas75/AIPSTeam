@@ -2205,7 +2205,7 @@ $($userInput.trim())
                     [System.Environment]::SetEnvironmentVariable('EXA_API_KEY', $ExaApiKey, 'User')
                 }
                 
-                #$WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
+                $WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
                 $WebResultsExa = Invoke-SearchExa -Query $ShortenedUserInput -BearerToken ([System.Environment]::GetEnvironmentVariable("EXA_API_KEY", "User")) -NumResults $MaxCount
                 Write-Verbose "Web search performed with query: '$ShortenedUserInput'"
                 Write-Host "++ Status: Web search completed successfully." -ForegroundColor Green
