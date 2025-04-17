@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - add EXA web search to RAG (https://exa.ai/). 
 - minor fixes.
 - added retry logic for web requests.
+- serper API integration (https://serper.dev/).
 
 ## [3.10.1] - 2025.04.16
 
