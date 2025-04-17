@@ -2264,7 +2264,6 @@ $($userInput.trim())
                     }
                 }
 
-                Write-Verbose "Web search performed with query: '$ShortenedUserInput'"
                 Write-Host "++ Status: Web search completed successfully." -ForegroundColor Green
                 Write-Verbose "Web results WebResultsSerpApi: $($WebResultsSerpApi | ConvertTo-Json -Depth 10)"
                 Write-Verbose "Web results WebResultsExa: $($WebResultsExa | ConvertTo-Json -Depth 10)"
