@@ -766,6 +766,7 @@ function Show-Banner {
                                                                      Web Search:
                                                                         https://serpapi.com/
                                                                         https://exa.ai/
+                                                                        https://serper.com/
    https://github.com/voytas75/AIPSTeam
   
 '@
