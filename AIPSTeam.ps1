@@ -2241,6 +2241,7 @@ $($userInput.trim())
                     }
                 }
                 catch {
+                    Write-Warning "Error occurred while fetching data from SerpApi: $_"
                     try {
                         $WebResultsExa = Invoke-SearchExa -Query $ShortenedUserInput -BearerToken ([System.Environment]::GetEnvironmentVariable("EXA_API_KEY", "User")) -NumResults $MaxCount
                         if ($WebResultsExa.Count -eq 0) {
@@ -2248,6 +2249,7 @@ $($userInput.trim())
                         }
                     }
                     catch {
+                        Write-Warning "Error occurred while fetching data from EXA: $_"
                         try {
                             $WebResultsSerper = Invoke-Serper -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPER_API_KEY", "User")) -NumResults $MaxCount
                             if ($WebResultsSerper.Count -eq 0) {
@@ -2255,6 +2257,7 @@ $($userInput.trim())
                             }
                         }
                         catch {
+                            Write-Warning "Error occurred while fetching data from Serper: $_"
                             Write-Warning "No web results returned from all providers."
                             throw $_
                         }
