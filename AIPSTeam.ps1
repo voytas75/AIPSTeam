@@ -2135,7 +2135,8 @@ function Invoke-Serper {
     [CmdletBinding()]
     param (
         [string]$Query,
-        [string]$ApiKey
+        [string]$ApiKey,
+        [int]$NumResults = 3
     )
     $url = "https://google.serper.dev/search"
     $headers = @{
@@ -2144,6 +2145,7 @@ function Invoke-Serper {
     }
     $body = [pscustomobject]@{
         q = $Query
+        num = $NumResults
     } | ConvertTo-Json
     try {
         $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body
@@ -2235,25 +2237,25 @@ $($userInput.trim())
                 try {
                     $WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
                     if ($WebResultsSerpApi.Count -eq 0) {
-                        throw "No data returned from SerpApi"
+                        Write-Warning "No data returned from SerpApi"
                     }
                 }
                 catch {
                     try {
                         $WebResultsExa = Invoke-SearchExa -Query $ShortenedUserInput -BearerToken ([System.Environment]::GetEnvironmentVariable("EXA_API_KEY", "User")) -NumResults $MaxCount
                         if ($WebResultsExa.Count -eq 0) {
-                            throw "No data returned from EXA"
+                            Write-Warning "No data returned from EXA"
                         }
                     }
                     catch {
                         try {
-                            $WebResultsSerper = Invoke-Serper -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPER_API_KEY", "User")) -Num $MaxCount
+                            $WebResultsSerper = Invoke-Serper -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPER_API_KEY", "User")) -NumResults $MaxCount
                             if ($WebResultsSerper.Count -eq 0) {
-                                throw "No data returned from Serper"
+                                Write-Warning "No data returned from Serper"
                             }
                         }
                         catch {
-                            Write-Error "No web results returned from all providers."
+                            Write-Warning "No web results returned from all providers."
                             throw $_
                         }
                     }
