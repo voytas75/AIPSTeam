@@ -1259,7 +1259,6 @@ function Update-GlobalStateWithResponse {
     }
 }
 
-
 function Invoke-ProcessFeedbackAndResponse {
     # Refactor Invoke-ProcessFeedbackAndResponse to use the new functions
     param (
@@ -1299,7 +1298,6 @@ function Invoke-ProcessFeedbackAndResponse {
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
 }
-
 
 function Save-AndUpdateCode {
     # Refactor Save-AndUpdateCode to use the new function
@@ -3542,7 +3540,7 @@ You are an experienced {0} specializing in PowerShell development projects. Your
 When summarizing a PowerShell project, you must:
 
 1. Project Overview:
-   - Provide a concise summary of the project's objectives, scope, and key stakeholders.
+   - Provide a concise summary of the project's objectives, scope.
 
 2. Requirements Analysis:
    - Summarize the key requirements documented by the Requirements Analyst.
@@ -3614,20 +3612,27 @@ $Team += $qaEngineer
 $Team += $documentationSpecialist
 $Team += $projectManager
 
+# Set the LLM provider for all team members to the global LLM provider
 foreach ($TeamMember in $Team) {
     $TeamMember.LLMProvider = $GlobalState.LLMProvider
 }
 
+# If the NOLog flag is set, clear the log file paths for all team members
+# This is useful when running the script in a non-interactive mode
 if ($GlobalState.NOLog) {
     foreach ($TeamMember_ in $Team) {
         $TeamMember_.LogFilePath = ""
     }
 }
 
+# Set up logging for the team discussion
 if (-not $GlobalState.NOLog) {
+    # Output the team member info to the log files
     foreach ($TeamMember in $Team) {
         $TeamMember.DisplayInfo(0) | Out-File -FilePath $TeamMember.LogFilePath -Append
     }
+
+    # Output the transcript to a file
     Write-Host "++ " -NoNewline
     Start-Transcript -Path (join-path $GlobalState.TeamDiscussionDataFolder "TRANSCRIPT.log") -Append
 }
