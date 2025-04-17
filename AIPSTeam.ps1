@@ -2101,6 +2101,35 @@ function Invoke-SerpApiGoogleSearch {
     }
 }
 
+function Invoke-SearchExa {
+    [CmdletBinding()]
+    param (
+        [string]$Query,
+        [string]$BearerToken,
+        [int]$NumResults = 10
+    )
+    $url = "https://api.exa.ai/search"
+    $headers = @{
+        "content-type" = "application/json"
+        "Authorization" = "Bearer $BearerToken"
+    }
+    $body = @{
+        "query" = $Query
+        "contents" = @{
+            "text" = $true
+            "numResults" = $NumResults
+        }
+    } | ConvertTo-Json
+    try {
+        $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Post -Body $body
+        return $response.results
+    } catch {
+        Write-Error "Exa search failed: $_"
+        return $null
+    }
+}
+
+
 function Invoke-RAG {
     param (
         [string]$UserInput,
@@ -2169,11 +2198,17 @@ $($userInput.trim())
                     $SerpApiKey = Read-Host "Please enter your SerpApi key and press Enter"
                     [System.Environment]::SetEnvironmentVariable('SERPAPI_API_KEY', $SerpApiKey, 'User')
                 }
+                if (-not [System.Environment]::GetEnvironmentVariable("EXA_API_KEY", "User")) {
+                    $ExaApiKey = Read-Host "Please enter your Exa.ai key and press Enter"
+                    [System.Environment]::SetEnvironmentVariable('EXA_API_KEY', $ExaApiKey, 'User')
+                }
                 
-                $WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
+                #$WebResultsSerpApi = Invoke-SerpApiGoogleSearch -Query $ShortenedUserInput -ApiKey ([System.Environment]::GetEnvironmentVariable("SERPAPI_API_KEY", "User")) -Num $MaxCount
+                $WebResultsExa = Invoke-SearchExa -Query $ShortenedUserInput -BearerToken ([System.Environment]::GetEnvironmentVariable("EXA_API_KEY", "User")) -NumResults $MaxCount
                 Write-Verbose "Web search performed with query: '$ShortenedUserInput'"
                 Write-Host "++ Status: Web search completed successfully." -ForegroundColor Green
                 Write-Verbose "Web results: $($WebResultsSerpApi | ConvertTo-Json -Depth 10)"
+                Write-Verbose "Web results: $($WebResultsExa | ConvertTo-Json -Depth 10)"
             }
             catch {
                 Write-Error "Error occurred during web search or logging: $_"
@@ -2186,22 +2221,39 @@ $($userInput.trim())
             throw "The query is empty. Unable to perform web search."
         }
 
-        $webResults = $WebResultsSerpApi
+        $webResults = $WebResultsSerpApi + $WebResultsExa
         # Check if web results are returned
         if ($webResults) {
             Write-Verbose "Web results returned. Extracting and cleaning text content."
 
             try {
-                # Extract and clean text content from the web results
-                $WebResultsText = ($WebResults | ForEach-Object {
-                        $HtmlContent = Invoke-WebRequest -Uri $_.link
-                        $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
-                        $TextContent
-                    }
-                ) -join "`n`n"
-                $WebResultsText = ($WebResultsText -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
-
-                Write-Verbose "Text content extracted and cleaned from web results."
+                if ($WebResultsSerpApi) {
+                    Write-Verbose "Extracting and cleaning text content from SERPAPI web results."
+                    # Extract and clean text content from the web results SERPAPI
+                    $WebResultsTextSerpApi = ($WebResultsSerpApi | ForEach-Object {
+                            $HtmlContent = Invoke-WebRequest -Uri $_.link
+                            $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
+                            $TextContent
+                        }
+                    ) -join "`n`n"
+                    Write-Verbose "Text content extracted and cleaned from SERPAPI web results."
+                    $WebResultsTextSerpApi = ($WebResultsTextSerpApi -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
+                }
+                if ($WebResultsExa) {
+                    Write-Verbose "Extracting and cleaning text content from EXA web results."
+                    # Extract and clean text content from the web results EXA
+                    $WebResultsTextExa = ($WebResultsExa | ForEach-Object {
+                            $HtmlContent = Invoke-WebRequest -Uri $_.url
+                            $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
+                            $TextContent
+                        }) -join "`n`n"
+                    Write-Verbose "Text content extracted and cleaned from EXA web results."
+                    $WebResultsTextExa = ($WebResultsTextExa -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
+                }
+                if ($WebResultsTextSerpApi -or $WebResultsTextExa) {
+                    $WebResultsText = $WebResultsTextSerpApi + "`n`n" + $WebResultsTextExa
+                    Write-Verbose "Web results text combined."
+                }
             }
             catch {
                 Write-Error "Error occurred while extracting or cleaning web results: $_"
