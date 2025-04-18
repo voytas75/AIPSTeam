@@ -3168,7 +3168,7 @@ if ($LoadProjectStatus) {
         Write-Host "Last file Version: $($($GlobalState.FileVersion) - 1)"
         $orgUserInput = $GlobalState.OrgUserInput
         if ($orgUserInput.Length -gt 50) {
-            $orgUserInput = $orgUserInput.Substring(0, 50) + "... (full length: $($orgUserInput.Length) characters)"
+            $orgUserInput = $orgUserInput.Substring(0, 120) + "... (full length: $($orgUserInput.Length) characters)"
         }
         Write-Host "User Input: $orgUserInput"
         Write-Host "Log Folder: $($GlobalState.LogFolder)"
