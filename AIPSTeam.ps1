@@ -1635,6 +1635,7 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
 
         # Invoke the Azure OpenAI chat completion function
         $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        #$response = PSAOAI\Invoke-PSAOAIChatCompletion -usermessage "${SystemPrompt}`n`n${UserPrompt}" -LogFolder $LogFolder -o1 -Deployment "o3" -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
 
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
