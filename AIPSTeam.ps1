@@ -3167,7 +3167,7 @@ if ($LoadProjectStatus) {
         Write-Host "Team Discussion Data Folder: $($GlobalState.TeamDiscussionDataFolder)"
         Write-Host "Last file Version: $($($GlobalState.FileVersion) - 1)"
         $orgUserInput = $GlobalState.OrgUserInput
-        if ($orgUserInput.Length -gt 50) {
+        if ($orgUserInput.Length -gt 120) {
             $orgUserInput = $orgUserInput.Substring(0, 120) + "... (full length: $($orgUserInput.Length) characters)"
         }
         Write-Host "User Input: $orgUserInput"
