@@ -613,7 +613,6 @@ Think step by step. Make sure your answer is unbiased.
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
     }
 }
-
 function Get-LastMemoryFromFeedbackTeamMembers {
     param (
         [array] $FeedbackTeam
@@ -1634,8 +1633,8 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         }
 
         # Invoke the Azure OpenAI chat completion function
-        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
-        #$response = PSAOAI\Invoke-PSAOAIChatCompletion -usermessage "${SystemPrompt}`n`n${UserPrompt}" -LogFolder $LogFolder -o1 -Deployment "o3" -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        #$response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -usermessage "${SystemPrompt}`n`n${UserPrompt}" -LogFolder $LogFolder -o1 -Deployment "o4-mini" -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
 
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
