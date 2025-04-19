@@ -246,7 +246,7 @@ class ProjectTeam {
         #write-Host $script:Stream
         $response = ""
         try {
-            Write-verbose $script:MaxTokens
+            Write-Verbose "Using $($script:MaxTokens) as the maximum number of tokens to generate in the response."
 
             # Use the user-provided function to get the response
             $loopCount = 0
@@ -316,6 +316,7 @@ class ProjectTeam {
             if ($null -eq $this.ResponseMemory) {
                 $this.ResponseMemory = @()
                 $this.AddLogEntry("Initialized ResponseMemory")
+                Write-Verbose "Initialized ResponseMemory."
             }
         
             # Initialize loop variables
@@ -459,6 +460,7 @@ class ProjectTeam {
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         $logEntry = "[$timestamp]:`n$(Show-Header -HeaderText $entry -output)"
         $this.Log.Add($logEntry)
+        Write-Verbose $logEntry
         if (-not [string]::IsNullOrEmpty($this.LogFilePath)) {
             # Write the log entry to the file
             Add-Content -Path $this.LogFilePath -Value $logEntry
