@@ -240,13 +240,13 @@ class ProjectTeam {
     [string] ProcessInput([string] $userinput) {
         Show-Header -HeaderText "Current Expert: $($this.Name) ($($this.Role))"
         # Log the input
-        $this.AddLogEntry("Processing input:`n$userinput")
+        $this.AddLogEntry("Processing input:$userinput")
         # Update status
         $this.Status = "In Progress"
         #write-Host $script:Stream
         $response = ""
         try {
-            Write-Verbose "Using $($script:MaxTokens) as the maximum number of tokens to generate in the response."
+            Write-VerboseWrapper "Using $($script:MaxTokens) as the maximum number of tokens to generate in the response."
 
             # Use the user-provided function to get the response
             $loopCount = 0
@@ -304,9 +304,8 @@ class ProjectTeam {
 
     [string] ProcessInput([string] $userinput, [string] $systemprompt) {
         Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
-    
         # Log the input
-        $this.AddLogEntry("Processing input:`n$userinput")
+        $this.AddLogEntry("Processing input:$userinput")
     
         # Update status
         $this.Status = "In Progress"
@@ -316,7 +315,7 @@ class ProjectTeam {
             if ($null -eq $this.ResponseMemory) {
                 $this.ResponseMemory = @()
                 $this.AddLogEntry("Initialized ResponseMemory")
-                Write-Verbose "Initialized ResponseMemory."
+                Write-VerboseWrapper "Initialized ResponseMemory."
             }
         
             # Initialize loop variables
@@ -325,11 +324,11 @@ class ProjectTeam {
         
             # Attempt to get a response from the LLM
             do {
-                Write-Verbose "Attempting to get a response from LLM. Loop count: $loopCount"
+                Write-VerboseWrapper "Attempting to get a response from LLM. Loop count: $loopCount"
                 $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $systemprompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
             
                 if (-not [string]::IsNullOrEmpty($response)) {
-                    Write-Verbose "Received a valid response from LLM."
+                    Write-VerboseWrapper "Received a valid response from LLM."
                     break
                 }
             
@@ -355,7 +354,7 @@ class ProjectTeam {
             $feedbackSummary = ""
             if ($this.FeedbackTeam.count -gt 0) {
                 # Request feedback for the response
-                Write-Verbose "Requesting feedback for the response."
+                Write-VerboseWrapper "Requesting feedback for the response."
                 $feedbackSummary = $this.RequestFeedback($response)
                 # Log the feedback summary
                 $this.AddLogEntry("Feedback summary:`n$feedbackSummary")
@@ -377,20 +376,19 @@ class ProjectTeam {
 
         # Pass to the next expert if available
         if ($null -ne $this.NextExpert) {
-            Write-Verbose "Passing response to the next expert."
+            Write-VerboseWrapper "Passing response to the next expert."
             return $this.NextExpert.ProcessInput($responseWithFeedback)
         }
         else {
-            Write-Verbose "No next expert available. Returning the response with feedback."
+            Write-VerboseWrapper "No next expert available. Returning the response with feedback."
             return $responseWithFeedback
         }
     }
     
     [string] Feedback([ProjectTeam] $AssessedExpert, [string] $Expertinput) {
         Show-Header -HeaderText "Feedback by $($this.Name) ($($this.Role)) for $($AssessedExpert.name)"
-        
         # Log the input
-        $this.AddLogEntry("Processing input:`n$Expertinput")
+        $this.AddLogEntry("Processing input:$Expertinput")
         
         # Update status
         $this.Status = "In Progress"
@@ -460,9 +458,17 @@ class ProjectTeam {
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         $logEntry = "[$timestamp]:`n$(Show-Header -HeaderText $entry -output)"
         $this.Log.Add($logEntry)
-        Write-Verbose $logEntry
         if (-not [string]::IsNullOrEmpty($this.LogFilePath)) {
             # Write the log entry to the file
+            $logEntryLength = $entry.Length
+            if ($logEntryLength -gt 100) {
+                $_logEntry = $entry.Substring(0, 100) + " ... (truncated, original length $logEntryLength, see log file)"
+                $_logEntry = $_logEntry -replace "\r\n", " "
+            }
+            else {
+                $_logEntry = $entry -replace "\r\n", " "
+            }
+            Write-Verbose $_logEntry
             Add-Content -Path $this.LogFilePath -Value $logEntry
         }
     }
@@ -676,15 +682,15 @@ function New-FolderAtPath {
 
     try {
         # Output verbose messages for debugging
-        Write-Verbose "New-FolderAtPath: $Path"
-        Write-Verbose "New-FolderAtPath: $FolderName"
+        Write-VerboseWrapper "New-FolderAtPath: $Path"
+        Write-VerboseWrapper "New-FolderAtPath: $FolderName"
 
         # Combine the Folder path with the folder name to get the full path
         $CompleteFolderPath = Join-Path -Path $Path -ChildPath $FolderName.trim()
 
         # Output the complete folder path and its type for debugging
-        Write-Verbose "New-FolderAtPath: $CompleteFolderPath"
-        Write-Verbose $CompleteFolderPath.gettype()
+        Write-VerboseWrapper "New-FolderAtPath: $CompleteFolderPath"
+        Write-VerboseWrapper $CompleteFolderPath.gettype()
 
         # Check if the folder exists, if not, create it
         if (-not (Test-Path -Path $CompleteFolderPath)) {
@@ -824,7 +830,7 @@ function Export-AndWritePowerShellCodeBlocks {
                 }
             }
             else {
-                Write-Verbose "++ Code block exported"
+                Write-VerboseWrapper "++ Code block exported"
                 return $codeBlock_
             }
         }
@@ -1248,7 +1254,7 @@ function Update-GlobalStateWithResponse {
             $GlobalState.fileVersion += 1
 
             # Output the saved file path for verbose logging
-            Write-Verbose $_savedFile
+            Write-VerboseWrapper $_savedFile
         }
         else {
             Write-Warning "!! The code does not exist. Unable to update the last code and file version."
@@ -1354,7 +1360,7 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
     Show-Header -HeaderText "Code analysis by PSScriptAnalyzer"
     try {
         # Log the last memory response from the PowerShell developer
-        Write-Verbose "getlastmemory PSDev: $InputString"
+        Write-VerboseWrapper "getlastmemory PSDev: $InputString"
         
         # Export the PowerShell code blocks from the input string
         $_exportedCode = Export-AndWritePowerShellCodeBlocks -InputString $InputString -StartDelimiter '```powershell' -EndDelimiter '```'
@@ -1362,7 +1368,7 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
         # Update the last PowerShell developer code with the exported code when not false
         if ($null -ne $_exportedCode -and $_exportedCode -ne $false) {
             $GlobalState.lastPSDevCode = $_exportedCode
-            Write-Verbose "_exportCode, lastPSDevCode: $($GlobalState.lastPSDevCode)"
+            Write-VerboseWrapper "_exportCode, lastPSDevCode: $($GlobalState.lastPSDevCode)"
         }
         
         # Analyze the code using PSScriptAnalyzer
@@ -1399,13 +1405,13 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
             
                 # Save the new version of the code to a file
                 $_savedFile = Export-AndWritePowerShellCodeBlocks -InputString $powerShellDeveloperResponce -OutputFilePath $(Join-Path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
-                Write-Verbose $_savedFile
+                Write-VerboseWrapper $_savedFile
             
                 if ($null -ne $_savedFile -and $_savedFile -ne $false) {
                     # Update the last code and file version
                     $GlobalState.lastPSDevCode = Get-Content -Path $_savedFile -Raw 
                     $GlobalState.FileVersion += 1
-                    Write-Verbose $GlobalState.lastPSDevCode
+                    Write-VerboseWrapper $GlobalState.lastPSDevCode
                 }
                 else {
                     Write-Information "-- No valid file to update the last code and file version."
@@ -1414,7 +1420,7 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
         } 
     
         # Log the last PowerShell developer code
-        Write-Verbose $GlobalState.lastPSDevCode
+        Write-VerboseWrapper $GlobalState.lastPSDevCode
     }    
     catch [System.Exception] {
         $functionName = $MyInvocation.MyCommand.Name
@@ -1560,14 +1566,14 @@ function Invoke-LLMChatCompletion {
         switch ($Provider) {
             "ollama" {
                 # Verbose message for invoking Ollama model
-                Write-Verbose "Invoking Ollama model completion function."
+                Write-VerboseWrapper "Invoking Ollama model completion function."
                 # Invoke the Ollama model completion function
                 $response = Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
                 return $response
             }
             "LMStudio" {
                 # Verbose message for invoking LMStudio model
-                Write-Verbose "Invoking LMStudio chat completion function."
+                Write-VerboseWrapper "Invoking LMStudio chat completion function."
                 # Handle streaming for LMStudio provider
                 # Invoke the LMStudio chat completion function
                 $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey $script:lmstudioApiKey -endpoint $script:lmstudioApiBase -Model $script:LMStudioModel
@@ -1575,20 +1581,20 @@ function Invoke-LLMChatCompletion {
             }
             "OpenAI" {
                 # Verbose message for unsupported LLM provider
-                Write-Verbose "Unsupported LLM provider: $Provider."
+                Write-VerboseWrapper "Unsupported LLM provider: $Provider."
                 # Throw an exception for unsupported LLM provider
                 throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
             }
             "AzureOpenAI" {
                 # Verbose message for invoking Azure OpenAI model
-                Write-Verbose "Invoking Azure OpenAI chat completion function."
+                Write-VerboseWrapper "Invoking Azure OpenAI chat completion function."
                 # Invoke the Azure OpenAI chat completion function
                 $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat -MaxTokens $MaxTokens
                 return $response
             }
             default {
                 # Verbose message for unknown LLM provider
-                Write-Verbose "Unknown LLM provider: $Provider."
+                Write-VerboseWrapper "Unknown LLM provider: $Provider."
                 # Throw an exception for unknown LLM provider
                 throw "!! Unknown LLM provider: $Provider"
             }
@@ -1618,14 +1624,14 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
 
     try {
         # Log the input parameters for debugging purposes
-        Write-Verbose "SystemPrompt: $SystemPrompt"
-        Write-Verbose "UserPrompt: $UserPrompt"
-        Write-Verbose "Temperature: $Temperature"
-        Write-Verbose "TopP: $TopP"
-        Write-Verbose "MaxTokens: $MaxTokens"
-        Write-Verbose "Stream: $Stream"
-        Write-Verbose "LogFolder: $LogFolder"
-        Write-Verbose "Deployment: $Deployment"
+        Write-VerboseWrapper "SystemPrompt: $SystemPrompt"
+        Write-VerboseWrapper "UserPrompt: $UserPrompt"
+        Write-VerboseWrapper "Temperature: $Temperature"
+        Write-VerboseWrapper "TopP: $TopP"
+        Write-VerboseWrapper "MaxTokens: $MaxTokens"
+        Write-VerboseWrapper "Stream: $Stream"
+        Write-VerboseWrapper "LogFolder: $LogFolder"
+        Write-VerboseWrapper "Deployment: $Deployment"
 
         # Notify the start of the Azure OpenAI process
         Write-Host "++ Initiating Azure OpenAI process for deployment: $Deployment..."
@@ -1635,8 +1641,8 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         }
 
         # Invoke the Azure OpenAI chat completion function
-        #$response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
-        $response = PSAOAI\Invoke-PSAOAIChatCompletion -usermessage "${SystemPrompt}`n`n${UserPrompt}" -LogFolder $LogFolder -o1 -Deployment "o4-mini" -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        #$response = PSAOAI\Invoke-PSAOAIChatCompletion -usermessage "${SystemPrompt}`n`n${UserPrompt}" -LogFolder $LogFolder -o1 -Deployment "o4-mini" -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
 
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
@@ -1652,7 +1658,7 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         }
 
         # Log the successful response
-        Write-Verbose "Azure OpenAI API response received successfully."
+        Write-VerboseWrapper "Azure OpenAI API response received successfully."
 
         return $response
     }
@@ -1694,11 +1700,11 @@ function Invoke-AIPSTeamOllamaCompletion {
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
     }
-    Write-Verbose "Constructed JSON payload for Ollama API: $ollamaJson"
+    Write-VerboseWrapper "Constructed JSON payload for Ollama API: $ollamaJson"
 
     # Define the URL for the Ollama API endpoint
     $url = "$($script:ollamaEndpoint)api/generate"
-    Write-Verbose "Ollama API endpoint URL: $url"
+    Write-VerboseWrapper "Ollama API endpoint URL: $url"
 
     # Notify the user that the Ollama model is processing
     Write-Host "++ Ollama model ($ollamaModel) is processing your request..."
@@ -1825,7 +1831,7 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         'max_tokens'  = $GlobalState.maxtokens
     } | ConvertTo-Json
 
-    Write-Verbose "Request Body JSON: $bodyJSON"
+    Write-VerboseWrapper "Request Body JSON: $bodyJSON"
 
     # Inform the user that the request is being processed
     $InfoText = "++ LM Studio" + $(if ($Model) { " model ($Model)" } else { "" }) + " is processing your request..."
@@ -1898,7 +1904,7 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         $completeText += "`n"
     
         if ($VerbosePreference -eq "Continue") {
-            Write-Verbose "Streaming completed. Full text: $completeText"
+            Write-VerboseWrapper "Streaming completed. Full text: $completeText"
         }
         else {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
@@ -1958,7 +1964,7 @@ function Invoke-BingWebSearch {
         $apiKey = Read-Host -Prompt "Please enter your AZURE Bing API key"
         if ($apiKey) {
             [System.Environment]::SetEnvironmentVariable("AZURE_BING_API_KEY", $apiKey, "User")
-            Write-Verbose "API key set successfully."
+            Write-VerboseWrapper "API key set successfully."
         }
     }
 
@@ -1967,7 +1973,7 @@ function Invoke-BingWebSearch {
         $endpoint = Read-Host -Prompt "Please enter the AZURE Bing Web Search Endpoint"
         if ($endpoint) {
             [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $endpoint, "User")
-            Write-Verbose "Endpoint set successfully."
+            Write-VerboseWrapper "Endpoint set successfully."
         }
     }
     
@@ -1976,14 +1982,14 @@ function Invoke-BingWebSearch {
         "Ocp-Apim-Subscription-Key" = $apiKey
         "Pragma"                    = "no-cache"
     }
-    Write-Verbose "Headers defined for the API request."
+    Write-VerboseWrapper "Headers defined for the API request."
 
     # If the query length is greater than the maximum allowed, truncate it
     $maxqueryLength = 120
     if ($query.Length -gt $maxqueryLength) {
         Write-Host "Query length is greater than $maxqueryLength characters. Truncating the query."
         $query = $query.Substring(0, $maxqueryLength)
-        Write-Verbose "Query truncated to $maxqueryLength characters."
+        Write-VerboseWrapper "Query truncated to $maxqueryLength characters."
     }
     
     # Define the parameters for the API request
@@ -1992,7 +1998,7 @@ function Invoke-BingWebSearch {
         "mkt"   = $language
         "count" = $count
     }
-    Write-Verbose "Parameters defined for the API request."
+    Write-VerboseWrapper "Parameters defined for the API request."
 
     # Ensure the endpoint is provided, prompt the user if not
     while ([string]::IsNullOrEmpty($Endpoint)) {
@@ -2000,23 +2006,23 @@ function Invoke-BingWebSearch {
     }
     [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $Endpoint, "User")
     $endpoint += "v7.0/search"
-    Write-Verbose "Final endpoint set to $endpoint."
+    Write-VerboseWrapper "Final endpoint set to $endpoint."
         
     # Disable the Expect100Continue behavior to avoid delays in sending data
     [System.Net.ServicePointManager]::Expect100Continue = $false
-    Write-Verbose "Expect100Continue behavior disabled."
+    Write-VerboseWrapper "Expect100Continue behavior disabled."
     
     # Disable the Nagle algorithm to improve performance for small data packets
     [System.Net.ServicePointManager]::UseNagleAlgorithm = $false
-    Write-Verbose "Nagle algorithm disabled."
+    Write-VerboseWrapper "Nagle algorithm disabled."
     
     # Set the security protocol to TLS 1.2 for secure communication
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
-    Write-Verbose "Security protocol set to TLS 1.2."
+    Write-VerboseWrapper "Security protocol set to TLS 1.2."
     
     try {
         # Make the API request to Bing Search
-        Write-Verbose "Making API request to Bing Search."
+        Write-VerboseWrapper "Making API request to Bing Search."
         Write-Host "++ Status: Initiating Bing Search API request..." -ForegroundColor Cyan
         $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -Body $params
 
@@ -2030,7 +2036,7 @@ function Invoke-BingWebSearch {
         Write-Host "++ Status: Bing Search API request completed successfully." -ForegroundColor Green
         Write-Host "++ Status: Number of web pages found: $($response.webPages.value.Count)" -ForegroundColor Green
 
-        Write-Verbose "API request successful. Returning search results."
+        Write-VerboseWrapper "API request successful. Returning search results."
 
         # Return the search results
         return $response.webPages.value
@@ -2172,7 +2178,7 @@ function Invoke-RAG {
     $RAGResponse = $null
     $ShortenedUserInput = ""
     try {
-        Write-Verbose "Starting Invoke-RAG function."
+        Write-VerboseWrapper "Starting Invoke-RAG function."
 
         # Define the system prompt for the RAG agent
         $RAGSystemPrompt = @"
@@ -2192,7 +2198,7 @@ Examples of well-formed queries:
 You must respond with the optimized query only ready to be invoked in search engine.
 "@
 
-        Write-Verbose "RAG system prompt defined."
+        Write-VerboseWrapper "RAG system prompt defined."
 
         # Create an optimized web search query based on the following text
         $RAGUserPrompt = @"
@@ -2205,24 +2211,24 @@ $($userInput.trim())
         # Process the user input with the RAG agent and trim the result
         $ShortenedUserInput = ($RAGAgent.ProcessInput($RAGUserPrompt, $RAGSystemPrompt)).trim()
 
-        Write-Verbose "RAG agent processed the input and returned a shortened user input."
+        Write-VerboseWrapper "RAG agent processed the input and returned a shortened user input."
 
         Write-Host ">> RAG is active. Enhancing AI Agent data..." -ForegroundColor Green
 
         # Check if the shortened user input is not empty
         if (-not [string]::IsNullOrEmpty($ShortenedUserInput)) {
-            Write-Verbose "Shortened user input is not empty. Proceeding with web search."
+            Write-VerboseWrapper "Shortened user input is not empty. Proceeding with web search."
 
             try {
                 # Define the log file path for storing the query
                 $LogFilePath = Join-Path -Path $GlobalState.TeamDiscussionDataFolder -ChildPath "websearchqueries.log"
-                Write-Verbose "Log file path defined: $LogFilePath"
+                Write-VerboseWrapper "Log file path defined: $LogFilePath"
 
                 # Append the shortened user input to the log file with a date prefix in professional log style
                 $DatePrefix = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
                 $LogEntry = "$DatePrefix - Query: '$ShortenedUserInput'"
                 Add-Content -Path $LogFilePath -Value $LogEntry
-                Write-Verbose "Log entry added: '$LogEntry'"
+                Write-VerboseWrapper "Log entry added: '$LogEntry'"
 
                 # Perform the web search using the shortened user input
                 #$WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User")) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"))
@@ -2270,9 +2276,9 @@ $($userInput.trim())
                 }
 
                 Write-Host "++ Status: Web search completed successfully." -ForegroundColor Green
-                Write-Verbose "Web results WebResultsSerpApi: $($WebResultsSerpApi | ConvertTo-Json -Depth 10)"
-                Write-Verbose "Web results WebResultsExa: $($WebResultsExa | ConvertTo-Json -Depth 10)"
-                Write-Verbose "Web results WebResultsSerper: $($WebResultsSerper | ConvertTo-Json -Depth 10)"
+                Write-VerboseWrapper "Web results WebResultsSerpApi: $($WebResultsSerpApi | ConvertTo-Json -Depth 10)"
+                Write-VerboseWrapper "Web results WebResultsExa: $($WebResultsExa | ConvertTo-Json -Depth 10)"
+                Write-VerboseWrapper "Web results WebResultsSerper: $($WebResultsSerper | ConvertTo-Json -Depth 10)"
             }
             catch {
                 Write-Error "Error occurred during web search or logging: $_"
@@ -2288,11 +2294,11 @@ $($userInput.trim())
         $webResults = $WebResultsSerpApi + $WebResultsExa + $WebResultsSerper
         # Check if web results are returned
         if ($webResults) {
-            Write-Verbose "Web results returned. Extracting and cleaning text content."
+            Write-VerboseWrapper "Web results returned. Extracting and cleaning text content."
 
             try {
                 if ($WebResultsSerpApi) {
-                    Write-Verbose "Extracting and cleaning text content from SERPAPI web results."
+                    Write-VerboseWrapper "Extracting and cleaning text content from SERPAPI web results."
                     # Extract and clean text content from the web results SERPAPI
                     $WebResultsTextSerpApi = ($WebResultsSerpApi | ForEach-Object {
                             #$HtmlContent = Invoke-WebRequest -Uri $_.link
@@ -2317,11 +2323,11 @@ $($userInput.trim())
                             $TextContent
                         }
                     ) -join "`n`n"
-                    Write-Verbose "Text content extracted and cleaned from SERPAPI web results."
+                    Write-VerboseWrapper "Text content extracted and cleaned from SERPAPI web results."
                     $WebResultsTextSerpApi = ($WebResultsTextSerpApi -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
                 }
                 if ($WebResultsExa) {
-                    Write-Verbose "Extracting and cleaning text content from EXA web results."
+                    Write-VerboseWrapper "Extracting and cleaning text content from EXA web results."
                     # Extract and clean text content from the web results EXA
                     $WebResultsTextExa = ($WebResultsExa | ForEach-Object {
                             #$HtmlContent = Invoke-WebRequest -Uri $_.url
@@ -2345,11 +2351,11 @@ $($userInput.trim())
                             $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
                             $TextContent
                         }) -join "`n`n"
-                    Write-Verbose "Text content extracted and cleaned from EXA web results."
+                    Write-VerboseWrapper "Text content extracted and cleaned from EXA web results."
                     $WebResultsTextExa = ($WebResultsTextExa -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
                 }
                 if ($WebResultsSerper) {
-                    Write-Verbose "Extracting and cleaning text content from Serper web results."
+                    Write-VerboseWrapper "Extracting and cleaning text content from Serper web results."
                     # Extract and clean text content from the web results Serper
                     $WebResultsTextSerper = ($WebResultsSerper | ForEach-Object {
                             #$HtmlContent = Invoke-WebRequest -Uri $_.url
@@ -2373,13 +2379,13 @@ $($userInput.trim())
                             $TextContent = ($HtmlContent.Content | PowerHTML\ConvertFrom-HTML).innerText
                             $TextContent
                         }) -join "`n`n"
-                    Write-Verbose "Text content extracted and cleaned from Serper web results."
+                    Write-VerboseWrapper "Text content extracted and cleaned from Serper web results."
                     $WebResultsTextSerper = ($WebResultsTextSerper -split "`n" | Where-Object { $_.Trim() } | Select-Object -Unique) -join "`n`n"
                 }
 
                 if ($WebResultsTextSerpApi -or $WebResultsTextExa -or $WebResultsTextSerper) {
                     $WebResultsText = $WebResultsTextSerpApi + "`n`n" + $WebResultsTextExa + "`n`n" + $WebResultsTextSerper
-                    Write-Verbose "Web results text combined."
+                    Write-VerboseWrapper "Web results text combined."
                 }
             }
             catch {
@@ -2388,7 +2394,7 @@ $($userInput.trim())
             }
         }
         else {
-            Write-Verbose "No web results returned."
+            Write-VerboseWrapper "No web results returned."
         }
 
         # Process the cleaned web results text with the project manager's input processing function
@@ -2841,7 +2847,7 @@ function Test-NeedForMoreInfo {
     )
 
     try {
-        Write-Verbose "Defining the system prompt and user prompt for the LLM."
+        Write-VerboseWrapper "Defining the system prompt and user prompt for the LLM."
         # Define the system prompt and user prompt for the LLM
         $systemPrompt = @"
 You are an AI assistant evaluating user inputs related to a PowerShell project. Your task is to assess each input for clarity and completeness, and to determine how much additional information or context is required to fully understand or respond to it.
@@ -2865,16 +2871,16 @@ Return only the numerical score (e.g., 0.50). Do not include explanations or com
 "@
         $userPrompt = "User input: $userInput"
 
-        Write-Verbose "Sending the prompt to the LLM."
+        Write-VerboseWrapper "Sending the prompt to the LLM."
         # Send the prompt to the LLM
         #$response = Invoke-LLMChatCompletion -Provider "AzureOpenAI" -SystemPrompt $systemPrompt -UserPrompt $userPrompt -Temperature 0.7 -TopP 1.0 -MaxTokens 50 -Stream $false -LogFolder "C:\Logs" -DeploymentChat "default"
         [string]$response = (Invoke-LLMChatCompletion -Provider $script:GlobalState.LLMProvider -SystemPrompt $systemPrompt -UserPrompt $userPrompt -Temperature 0.7 -TopP 1 -MaxTokens 10 -Stream $false -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel).trim()
-        Write-Verbose "LLM Response for 'Test-NeedForMoreInfo': '$response'"
+        Write-VerboseWrapper "LLM Response for 'Test-NeedForMoreInfo': '$response'"
         if ($response -match '\.') {
             $response = $response -replace '\.', ','
         }
 
-        Write-Verbose "Validating and parsing the response from the LLM."
+        Write-VerboseWrapper "Validating and parsing the response from the LLM."
         
         # Validate and parse the response
         [double]$parsedValue = 0.00
@@ -2883,7 +2889,7 @@ Return only the numerical score (e.g., 0.50). Do not include explanations or com
             throw "Invalid response received from LLM. Expected a numeric value but got: '$response'. Please check the LLM configuration and input."
         }
 
-        Write-Verbose "Determining if more information is needed based on the response."
+        Write-VerboseWrapper "Determining if more information is needed based on the response."
         
         # Determine if more information is needed and return true or false
         $needMoreInfo = $parsedValue
@@ -2901,6 +2907,37 @@ Return only the numerical score (e.g., 0.50). Do not include explanations or com
         return $false
     }
 }
+
+function Write-VerboseWrapper {
+    <#
+    .SYNOPSIS
+        Writes a verbose message to the console after checking and truncating it if it exceeds 150 characters.
+
+    .DESCRIPTION
+        This function takes a string message as input and writes it to the console using Write-Verbose.
+        If the message exceeds 150 characters, it is truncated and "...(truncated, original length <length>)" is appended to the end.
+
+    .PARAMETER Message
+        The message to be written to the console.
+
+    .EXAMPLE
+        Write-VerboseWrapper -Message "This is a very long message that exceeds 150 characters and needs to be truncated."
+    #>
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Message
+    )
+    if ($Message.Length -gt 150) {
+        $verboseMessage = "$($Message.Substring(0, 100))...(truncated, original length $($Message.Length))"
+    }
+    else {
+        $verboseMessage = $Message
+    }
+    $verboseMessage = $verboseMessage -replace "\r\n", " "
+    Write-Verbose -Message $verboseMessage
+}
+
+
 #endregion Functions
 
 #region Setting Up
@@ -3064,7 +3101,7 @@ if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
         $script:lmstudioApiKey = 'lm-studio'
         $env:OPENAI_API_KEY = $script:lmstudioApiKey
         [System.Environment]::SetEnvironmentVariable('OPENAI_API_KEY', $script:lmstudioApiKey, 'user')
-        Write-Verbose "++ Default LM Studio API key set to 'lm-studio'"
+        Write-VerboseWrapper "++ Default LM Studio API key set to 'lm-studio'"
     }
 
     # If the API base URL is not set, use the default value 'http://localhost:1234/v1' and set it in the environment variables
@@ -3072,7 +3109,7 @@ if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
         $script:lmstudioApiBase = 'http://localhost:1234/v1'
         $env:OPENAI_API_BASE = $script:lmstudioApiBase
         [System.Environment]::SetEnvironmentVariable('OPENAI_API_BASE', $script:lmstudioApiBase, 'user')
-        Write-Verbose "++ Default LM Studio API base set to 'http://localhost:1234/v1'"
+        Write-VerboseWrapper "++ Default LM Studio API base set to 'http://localhost:1234/v1'"
     }
 
     # Ensure the LMStudio endpoint ends with a '/'
@@ -3146,23 +3183,23 @@ if ($LoadProjectStatus) {
         $GlobalState = Get-ProjectState -FilePath $LoadProjectStatus
         Write-Information "++ Project state loaded successfully from $LoadProjectStatus" -InformationAction Continue
         # Output verbose information about the loaded project state
-        Write-Verbose "`$GlobalState.TeamDiscussionDataFolder: $($GlobalState.TeamDiscussionDataFolder)"
-        Write-Verbose "`$GlobalState.FileVersion: $($GlobalState.FileVersion)"
-        Write-Verbose "`$GlobalState.LastPSDevCode: $($GlobalState.LastPSDevCode)"
-        Write-Verbose "`$GlobalState.GlobalPSDevResponse: $($GlobalState.GlobalPSDevResponse)"
-        Write-Verbose "`$GlobalState.GlobalResponse: $($GlobalState.GlobalResponse)"
-        Write-Verbose "`$GlobalState.OrgUserInput: $($GlobalState.OrgUserInput)"
-        Write-Verbose "`$GlobalState.UserInput: $($GlobalState.UserInput)"
-        Write-Verbose "`$GlobalState.LogFolder: $($GlobalState.LogFolder)"
-        Write-Verbose "`$GlobalState.MaxTokens: $($GlobalState.MaxTokens)"
-        Write-Verbose "`$GlobalState.VerbosePrompt: $($GlobalState.VerbosePrompt)"
-        Write-Verbose "`$GlobalState.NOTips: $($GlobalState.NOTips)"
-        Write-Verbose "`$GlobalState.NOLog: $($GlobalState.NOLog)"
-        Write-Verbose "`$GlobalState.NODocumentator: $($GlobalState.NODocumentator)"
-        Write-Verbose "`$GlobalState.NOPM: $($GlobalState.NOPM)"
-        Write-Verbose "`$GlobalState.RAG: $($GlobalState.RAG)"
-        Write-Verbose "`$GlobalState.Stream: $($GlobalState.Stream)"
-        Write-Verbose "`$GlobalState.LLMProvider: $($GlobalState.LLMProvider)"
+        Write-VerboseWrapper "`$GlobalState.TeamDiscussionDataFolder: $($GlobalState.TeamDiscussionDataFolder)"
+        Write-VerboseWrapper "`$GlobalState.FileVersion: $($GlobalState.FileVersion)"
+        Write-VerboseWrapper "`$GlobalState.LastPSDevCode: $($GlobalState.LastPSDevCode)"
+        Write-VerboseWrapper "`$GlobalState.GlobalPSDevResponse: $($GlobalState.GlobalPSDevResponse)"
+        Write-VerboseWrapper "`$GlobalState.GlobalResponse: $($GlobalState.GlobalResponse)"
+        Write-VerboseWrapper "`$GlobalState.OrgUserInput: $($GlobalState.OrgUserInput)"
+        Write-VerboseWrapper "`$GlobalState.UserInput: $($GlobalState.UserInput)"
+        Write-VerboseWrapper "`$GlobalState.LogFolder: $($GlobalState.LogFolder)"
+        Write-VerboseWrapper "`$GlobalState.MaxTokens: $($GlobalState.MaxTokens)"
+        Write-VerboseWrapper "`$GlobalState.VerbosePrompt: $($GlobalState.VerbosePrompt)"
+        Write-VerboseWrapper "`$GlobalState.NOTips: $($GlobalState.NOTips)"
+        Write-VerboseWrapper "`$GlobalState.NOLog: $($GlobalState.NOLog)"
+        Write-VerboseWrapper "`$GlobalState.NODocumentator: $($GlobalState.NODocumentator)"
+        Write-VerboseWrapper "`$GlobalState.NOPM: $($GlobalState.NOPM)"
+        Write-VerboseWrapper "`$GlobalState.RAG: $($GlobalState.RAG)"
+        Write-VerboseWrapper "`$GlobalState.Stream: $($GlobalState.Stream)"
+        Write-VerboseWrapper "`$GlobalState.LLMProvider: $($GlobalState.LLMProvider)"
 
         Write-Host "Some values of the imported project:"
         Write-Host "Team Discussion Data Folder: $($GlobalState.TeamDiscussionDataFolder)"
@@ -3642,7 +3679,7 @@ if (-not $GlobalState.NOLog) {
 #region NeedForMoreInfoTest
 if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction) {
     # Verbose message indicating the start of the need for more information test
-    Write-Verbose "Starting the Test-NeedForMoreInfo function to evaluate user input."
+    Write-VerboseWrapper "Starting the Test-NeedForMoreInfo function to evaluate user input."
 
     do {
         # Call the Test-NeedForMoreInfo function with the provided user input
@@ -3681,34 +3718,34 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
             # Clean the additional input variable
             $additionalInput = $additionalInput.Trim()
 
-            Write-Verbose "User provided $($additionalInput.Length) characters of additional information: '$additionalInput'"
+            Write-VerboseWrapper "User provided $($additionalInput.Length) characters of additional information: '$additionalInput'"
             if (-not $additionalInput) {
-                Write-Verbose "No additional information provided."
+                Write-VerboseWrapper "No additional information provided."
             }
             else {
-                Write-Verbose "Additional information provided."
+                Write-VerboseWrapper "Additional information provided."
             }
 
             if ($additionalInput -in @('q', "Q", "quit")) {
-                Write-Verbose "User chose to proceed with current input as is."
+                Write-VerboseWrapper "User chose to proceed with current input as is."
                 $needMoreInfo = $false
             }
             elseif ($additionalInput) {
                 if ($GlobalState.UserCode) {
-                    Write-Verbose "Adding user-provided additional information to the user-provided code."
+                    Write-VerboseWrapper "Adding user-provided additional information to the user-provided code."
                     $userInput += "`n" + $additionalInput
                     $GlobalState.UserInput = $userInput
                     $needMoreInfo = $false
                     Write-Host "++ Proceeding with additional information."
                 }
                 else {
-                    Write-Verbose "Adding user-provided additional information to original input."
+                    Write-VerboseWrapper "Adding user-provided additional information to original input."
                     $userInput += " " + $additionalInput
                     $GlobalState.UserInput = $userInput
                 }
             }
             else {
-                Write-Verbose "No additional information provided. Proceeding with current input as is."
+                Write-VerboseWrapper "No additional information provided. Proceeding with current input as is."
                 $needMoreInfo = $false
                 Write-Host "++ Proceeding with current input as is."
                 Write-Host "++ User input: $($GlobalState.UserInput)"
@@ -3720,7 +3757,7 @@ if (-not $NOUserInputCheck -and -not $LoadProjectStatus -and -not $NOInteraction
     } while ($needMoreInfo)
 
     # Verbose message indicating the end of the need for more information test
-    Write-Verbose "Completed the Test-NeedForMoreInfo function."
+    Write-VerboseWrapper "Completed the Test-NeedForMoreInfo function."
 }
 #endregion NeedForMoreInfoTest
 
@@ -4091,7 +4128,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 Get-SourceCodeAnalysis -CodeBlock $GlobalState.lastPSDevCode
                 Write-Output ""                
                 # Perform cyclomatic complexity analysis
-                Write-Verbose "`$lastPSDevCode: $($GlobalState.lastPSDevCode)"
+                Write-VerboseWrapper "`$lastPSDevCode: $($GlobalState.lastPSDevCode)"
                 Write-Output "`nCyclomatic complexity analysis:"
                 if ($CyclomaticComplexity = Get-CyclomaticComplexity -CodeBlock $GlobalState.lastPSDevCode) {
                     $CyclomaticComplexity
