@@ -240,7 +240,7 @@ class ProjectTeam {
     [string] ProcessInput([string] $userinput) {
         Show-Header -HeaderText "Current Expert: $($this.Name) ($($this.Role))"
         # Log the input
-        $this.AddLogEntry("Processing input:$userinput")
+        $this.AddLogEntry("Processing input: $userinput")
         # Update status
         $this.Status = "In Progress"
         #write-Host $script:Stream
@@ -266,7 +266,7 @@ class ProjectTeam {
                 Write-Host $response -ForegroundColor White
             }
             # Log the response
-            $this.AddLogEntry("Generated response:`n$response")
+            $this.AddLogEntry("Generated response: $response")
             # Store the response in memory with timestamp
             $this.ResponseMemory.Add([PSCustomObject]@{
                     Response  = $response
@@ -305,7 +305,7 @@ class ProjectTeam {
     [string] ProcessInput([string] $userinput, [string] $systemprompt) {
         Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
         # Log the input
-        $this.AddLogEntry("Processing input:$userinput")
+        $this.AddLogEntry("Processing input: $userinput")
     
         # Update status
         $this.Status = "In Progress"
@@ -343,7 +343,7 @@ class ProjectTeam {
             }
         
             # Log the response
-            $this.AddLogEntry("Generated response:`n$response")
+            $this.AddLogEntry("Generated response: $response")
         
             # Store the response in memory with timestamp
             $this.ResponseMemory.Add([PSCustomObject]@{
@@ -388,7 +388,7 @@ class ProjectTeam {
     [string] Feedback([ProjectTeam] $AssessedExpert, [string] $Expertinput) {
         Show-Header -HeaderText "Feedback by $($this.Name) ($($this.Role)) for $($AssessedExpert.name)"
         # Log the input
-        $this.AddLogEntry("Processing input:$Expertinput")
+        $this.AddLogEntry("Processing input: $Expertinput")
         
         # Update status
         $this.Status = "In Progress"
@@ -418,7 +418,7 @@ class ProjectTeam {
             }
         
             # Log the response
-            $this.AddLogEntry("Generated feedback response:`n$response")
+            $this.AddLogEntry("Generated feedback response: $response")
             
             # Verify the response before adding to memory
             $this.AddLogEntry("Response before adding to memory: $response")
@@ -438,7 +438,7 @@ class ProjectTeam {
         }
         catch {
             # Log the error
-            $this.AddLogEntry("Error:`n$_")
+            $this.AddLogEntry("Error: $_")
             # Update status
             $this.Status = "Error"
             throw $_
@@ -511,12 +511,12 @@ class ProjectTeam {
             } while ($loopCount -lt $maxLoops)
 
             # Log the summary
-            $this.AddLogEntry("Generated summary:`n$summary")
+            $this.AddLogEntry("Generated summary: $summary")
             return $summary
         }
         catch {
             # Log the error
-            $this.AddLogEntry("Error:`n$_")
+            $this.AddLogEntry("Error: $_")
             throw $_
         }
     }
@@ -1626,12 +1626,10 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         # Log the input parameters for debugging purposes
         Write-VerboseWrapper "SystemPrompt: $SystemPrompt"
         Write-VerboseWrapper "UserPrompt: $UserPrompt"
-        Write-VerboseWrapper "Temperature: $Temperature"
-        Write-VerboseWrapper "TopP: $TopP"
-        Write-VerboseWrapper "MaxTokens: $MaxTokens"
+        Write-VerboseWrapper "Temperature: $Temperature; TopP: $TopP; MaxTokens: $MaxTokens"
+        Write-VerboseWrapper "Deployment: $Deployment"
         Write-VerboseWrapper "Stream: $Stream"
         Write-VerboseWrapper "LogFolder: $LogFolder"
-        Write-VerboseWrapper "Deployment: $Deployment"
 
         # Notify the start of the Azure OpenAI process
         Write-Host "++ Initiating Azure OpenAI process for deployment: $Deployment..."
@@ -1783,9 +1781,9 @@ function Invoke-AIPSTeamOllamaCompletion {
     } | ConvertTo-Json
 
     [void]($this.Log.Add($logEntry))
-    $this.AddLogEntry("SystemPrompt:`n$SystemPrompt")
-    $this.AddLogEntry("UserPrompt:`n$UserPrompt")
-    $this.AddLogEntry("Response:`n$response")
+    $this.AddLogEntry("SystemPrompt: $SystemPrompt")
+    $this.AddLogEntry("UserPrompt: $UserPrompt")
+    $this.AddLogEntry("Response: $response")
     
     Write-Host "++ Ollama model ($ollamaModel) has successfully processed your request."
 
@@ -1931,9 +1929,9 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
     
     [void]($this.Log.Add($logEntry))
     # Log the summary
-    [void]($this.AddLogEntry("SystemPrompt:`n$SystemPrompt"))
-    [void]($this.AddLogEntry("UserPrompt:`n$UserPrompt"))
-    [void]($this.AddLogEntry("Response:`n$Response"))
+    [void]($this.AddLogEntry("SystemPrompt: $SystemPrompt"))
+    [void]($this.AddLogEntry("UserPrompt: $UserPrompt"))
+    [void]($this.AddLogEntry("Response: $Response"))
     
     $InfoText = "++ LM Studio" + $(if ($Model) { " model ($Model)" } else { "" }) + " has successfully processed your request."
     Write-Host $InfoText
