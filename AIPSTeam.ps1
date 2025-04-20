@@ -4113,7 +4113,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                         }
                         $promptMessage = "Your task is to address issues found in PSScriptAnalyzer report."
                         $promptMessage += "`n`nPSScriptAnalyzer report, issues:`n``````text`n$issueText`n```````n`n"
-                        $promptMessage += "The code:`n``````powershell`n" + $GlobalState.lastPSDevCode + "`n```````n`nShow the new version of the Powershell code with solved issues."
+                        $promptMessage += "The code:`n``````powershell`n" + $GlobalState.lastPSDevCode + "`n```````n`nShow the new version of the PowerShell code with the PSScriptAnalyzer issues fixed. Do not change any other logic or functionality in the code—only address the reported issues."
                         $issues = ""
                         $issueText = ""
                         $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage, $null)
@@ -4135,8 +4135,6 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 # Option 3: Analyze PSScriptAnalyzer only
                 Show-Header -HeaderText "Analyze PSScriptAnalyzer only"
                 try {
-                    # Call the function to check the code in 'TheCode.ps1' file
-                    #$issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $(Export-AndWritePowerShellCodeBlocks -InputString $($powerShellDeveloper.GetLastMemory().Response) -StartDelimiter '```powershell' -EndDelimiter '```')
                     $issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $GlobalState.lastPSDevCode 
                     if ($issues) {
                         write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
