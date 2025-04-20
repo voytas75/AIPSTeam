@@ -316,7 +316,7 @@ class ProjectTeam {
 
         # Pass to the next expert if available
         if ($null -ne $this.NextExpert) {
-            return $this.NextExpert.ProcessInput($responseWithFeedback)
+            return $this.NextExpert.ProcessInput($responseWithFeedback, $null)
         }
         else {
             return $responseWithFeedback
@@ -398,7 +398,7 @@ class ProjectTeam {
         # Pass to the next expert if available
         if ($null -ne $this.NextExpert) {
             Write-VerboseWrapper "Passing response to the next expert."
-            return $this.NextExpert.ProcessInput($responseWithFeedback)
+            return $this.NextExpert.ProcessInput($responseWithFeedback, $null)
         }
         else {
             Write-VerboseWrapper "No next expert available. Returning the response with feedback."
@@ -408,7 +408,7 @@ class ProjectTeam {
 
     [string] ProcessInput(
         [string] $UserInput,
-        [string] $SystemPrompt = $null
+        [string] $SystemPrompt
     ) {
         if ([string]::IsNullOrWhiteSpace($UserInput)) {
             throw "UserInput cannot be empty."
@@ -613,7 +613,7 @@ class ProjectTeam {
     }
 
     [string] ProcessBySpecificExpert([ProjectTeam] $expert, [string] $userinput) {
-        return $expert.ProcessInput($userinput)
+        return $expert.ProcessInput($userinput, $null)
     }
 
     [System.Collections.ArrayList] RequestFeedback([string] $response) {
@@ -1314,7 +1314,7 @@ $($GlobalState.LastPSDevCode)
         }
 
         # Get the response from the recipient
-        $response = $Recipient.ProcessInput($responsePrompt)
+        $response = $Recipient.ProcessInput($responsePrompt, $null)
 
         return $response
     }    
@@ -1488,7 +1488,7 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
             $issueText = ""
         
             # Process the input with the PowerShell developer
-            $powerShellDeveloperResponce = $role.ProcessInput($promptMessage)
+            $powerShellDeveloperResponce = $role.ProcessInput($promptMessage, $null)
         
             if ($powerShellDeveloperResponce) {
                 # Update the global response with the new response
@@ -3930,7 +3930,7 @@ $($($GlobalState.userInput).trim())
     if (-not $GlobalState.NOTips) {
         $powerShellDeveloperPrompt += "`n`nNote: There is `$50 tip for this task."
     }
-    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($powerShellDeveloperPrompt)
+    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($powerShellDeveloperPrompt, $null)
 
     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
     Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
@@ -3982,11 +3982,11 @@ $($($GlobalState.userInput).trim())
     #region Doc
     if (-not $GlobalState.NODocumentator) {
         if (-not $GlobalState.NOLog) {
-            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode) 
+            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode, $null) 
             $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
         }
         else {
-            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode)
+            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode, $null)
         }
         Add-ToGlobalResponses $GlobalState $documentationSpecialistResponce
     }
@@ -3998,11 +3998,11 @@ $($($GlobalState.userInput).trim())
         if (-not $GlobalState.NOLog) {
             $projectManagerPrompt = "Generate project report without showing the PowerShell code.`n"
             $projectManagerPrompt += $GlobalState.GlobalResponse -join ", "
-            $projectManagerResponse = $projectManager.ProcessInput($projectManagerPrompt) 
+            $projectManagerResponse = $projectManager.ProcessInput($projectManagerPrompt, $null) 
             $projectManagerResponse | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
         }
         else {
-            $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ")
+            $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ", $null)
         }
         Add-ToGlobalResponses $GlobalState $projectManagerResponse
     }
@@ -4066,7 +4066,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                     $promptMessage = "Based on the user's suggestion, incorporate a feature, enhancement, or change into the code. Show the next version of the code."
                     $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastPSDevCode
                     $MenuPrompt_ += "`nYou need to show all the code."
-                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($MenuPrompt_)
+                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($MenuPrompt_, $null)
                     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
                     Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
@@ -4102,7 +4102,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                         $promptMessage += "The code:`n``````powershell`n" + $GlobalState.lastPSDevCode + "`n```````n`nShow the new version of the Powershell code with solved issues."
                         $issues = ""
                         $issueText = ""
-                        $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage)
+                        $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage, $null)
                         $GlobalPSDevResponse += $powerShellDeveloperResponce
                         Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
                         $theCode = Export-AndWritePowerShellCodeBlocks -InputString $($powerShellDeveloper.GetLastMemory().Response) -StartDelimiter '```powershell' -EndDelimiter '```'
@@ -4139,7 +4139,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 $promptMessage = "Please provide a detailed explanation of the following PowerShell code.`n`n"
                 $promptMessage += "Here is the code to be explained:`n````````powershell`n" + $GlobalState.lastPSDevCode + "`n`````````n"
                 try {
-                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage)
+                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($promptMessage, $null)
                     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
                     Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
@@ -4163,7 +4163,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                     $promptMessage += "You must answer the user's question only. Do not show the whole code even if user asks."
                     $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastPSDevCode
                     $MenuPrompt_ += $userChanges
-                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($MenuPrompt_)
+                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($MenuPrompt_, $null)
                     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
                     Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
@@ -4189,13 +4189,13 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                             $promptMessage = "Review and update the documentation based on the last version of the code.`n`n"
                             $promptMessage += "The code:`n``````powershell`n" + $GlobalState.lastPSDevCode + "`n```````n`n"
                             $promptMessage += "The old documentation:`n````````text`n" + $(get-content -path $DocumentationFullName -raw) + "`n`````````n"
-                            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($promptMessage)
+                            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($promptMessage, $null)
                             $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName -Force
                             Write-Information "++ Documentation updated and saved to $DocumentationFullName" -InformationAction Continue
                         }
                     }
                     else {
-                        $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode)
+                        $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode, $null)
                         $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
                         Write-Information "++ Documentation generated and saved to $DocumentationFullName" -InformationAction Continue
                     }
@@ -4275,7 +4275,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 $promptMessage = "Provide suggestions for refactoring the code to improve readability, maintainability, and performance."
                 $MenuPrompt_ = $MenuPromptNoUserChanges -f $promptMessage, $GlobalState.lastPSDevCode
                 $MenuPrompt_ += "`nShow only suggestions. No code"
-                $refactoringSuggestions = $powerShellDeveloper.ProcessInput($MenuPrompt_)
+                $refactoringSuggestions = $powerShellDeveloper.ProcessInput($MenuPrompt_, $null)
                 $GlobalState.GlobalPSDevResponse += $refactoringSuggestions
                 Add-ToGlobalResponses $GlobalState $refactoringSuggestions
 
@@ -4288,7 +4288,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 if ($deployChoice -eq 'Y' -or $deployChoice -eq 'y') {
                     $deployPromptMessage = "Deploy the refactoring suggestions into the code. Show the next version of the code."
                     $DeployMenuPrompt_ = $MenuPrompt -f $deployPromptMessage, $refactoringSuggestions, $GlobalState.lastPSDevCode
-                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($DeployMenuPrompt_)
+                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($DeployMenuPrompt_, $null)
                     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
                     Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
@@ -4304,7 +4304,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 $promptMessage = "Conduct a security audit of the code to identify potential vulnerabilities and ensure best security practices are followed. Show only security audit report."
                 $MenuPrompt_ = $MenuPromptNoUserChanges -f $promptMessage, $GlobalState.lastPSDevCode
                 $MenuPrompt_ += "`nShow only security audit report. No Code."
-                $powerShellDevelopersecurityAuditReport = $powerShellDeveloper.ProcessInput($MenuPrompt_)
+                $powerShellDevelopersecurityAuditReport = $powerShellDeveloper.ProcessInput($MenuPrompt_, $null)
                 $GlobalState.GlobalPSDevResponse += $powerShellDevelopersecurityAuditReport
                 Add-ToGlobalResponses $GlobalState $powerShellDevelopersecurityAuditReport
 
@@ -4317,7 +4317,7 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 if ($deployChoice -eq 'Y' -or $deployChoice -eq 'y') {
                     $deployPromptMessage = "Deploy the security improvements into the code. Show the next version of the code."
                     $DeployMenuPrompt_ = $MenuPrompt -f $deployPromptMessage, $powerShellDevelopersecurityAuditReport, $GlobalState.lastPSDevCode
-                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($DeployMenuPrompt_)
+                    $powerShellDeveloperResponce = $powerShellDeveloper.ProcessInput($DeployMenuPrompt_, $null)
                     #$GlobalState.GlobalPSDevResponse += $powerShellDeveloperResponce
                     Add-ToGlobalPSDevResponses $GlobalState $powerShellDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $powerShellDeveloperResponce
