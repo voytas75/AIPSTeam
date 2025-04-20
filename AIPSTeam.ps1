@@ -974,7 +974,7 @@ function Invoke-CodeWithPSScriptAnalyzer {
 
         # Display the analysis results
         if ($analysisResults.Count -eq 0) {
-            Write-Information "++ No Warning, Error issues found by PSScriptAnalyzer." -InformationAction Continue
+            Write-Information "++ PSScriptAnalyzer found no issues with severity Warning or Error." -InformationAction Continue
             return $false
         }
         else {
@@ -2318,7 +2318,7 @@ $($userInput.trim())
                 $DatePrefix = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
                 $LogEntry = "$DatePrefix - Query: '$ShortenedUserInput'"
                 Add-Content -Path $LogFilePath -Value $LogEntry
-                Write-VerboseWrapper "Log entry added: '$LogEntry'"
+                Write-VerboseWrapper "web search query logged: '$ShortenedUserInput'"
 
                 # Perform the web search using the shortened user input
                 #$WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User")) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"))
@@ -2988,6 +2988,7 @@ Return only the numerical score (e.g., 0.50). Do not include explanations or com
         $logFilePath = Join-Path $script:GlobalState.TeamDiscussionDataFolder "needMoreInfo.log"
         $logMessage = "needMoreInfo value: $needMoreInfo"
         Add-Content -Path $logFilePath -Value $logMessage
+        Write-VerboseWrapper "needMoreInfo value logged: $needMoreInfo"
 
         return $needMoreInfo -ge $positiveLimit
     }
