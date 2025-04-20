@@ -178,9 +178,16 @@ class ProjectTeam {
     [array] $FeedbackTeam  # Team of experts providing feedback
     [PSCustomObject] $GlobalState
     [string] $LLMProvider
-    
+
     # Constructor for the ProjectTeam class
-    ProjectTeam([string] $name, [string] $role, [string] $prompt, [double] $temperature, [double] $top_p, [PSCustomObject] $GlobalState) {
+    ProjectTeam(
+        [string] $name, 
+        [string] $role, 
+        [string] $prompt, 
+        [double] $temperature, 
+        [double] $top_p, 
+        [PSCustomObject] $GlobalState
+    ) {
         $this.Name = $name
         $this.Role = $role
         $this.Prompt = $prompt
@@ -194,6 +201,17 @@ class ProjectTeam {
         $this.LogFilePath = "$($GlobalState.TeamDiscussionDataFolder)\$name.log"
         $this.FeedbackTeam = @()
         $this.LLMProvider = "AzureOpenAI"  # Default to AzureOpenAI, can be changed as needed
+    }
+
+    [string] InvokeWithRetry([scriptblock] $call, [int] $max=5, [int] $delay=2) {
+        for ($i = 0; $i -lt $max; $i++) {
+            try {
+                $resp = & $call
+                if (-not [string]::IsNullOrEmpty($resp)) { return $resp }
+            } catch { }
+            Start-Sleep -Seconds ($delay * ($i + 1))
+        }
+        throw "LLM call failed after $max attempts."
     }
 
     # Method to display the team member's information
@@ -248,18 +266,19 @@ class ProjectTeam {
         try {
             Write-VerboseWrapper "Using $($script:MaxTokens) as the maximum number of tokens to generate in the response."
 
-            # Use the user-provided function to get the response
-            $loopCount = 0
-            $maxLoops = 5
-            do {
-                $response = Invoke-LLMChatCompletion -Provider $this.LLMProvider -SystemPrompt $this.Prompt -UserPrompt $userinput -Temperature $this.Temperature -TopP $this.TopP -MaxTokens $script:MaxTokens -Stream $script:GlobalState.Stream -LogFolder $script:GlobalState.TeamDiscussionDataFolder -DeploymentChat $script:DeploymentChat -ollamaModel $script:ollamaModel
-                if (-not [string]::IsNullOrEmpty($response)) {
-                    break
-                }
-                Write-Host "Attempting to obtain a response. This process will be repeated if necessary." -ForegroundColor Yellow
-                Start-Sleep -Seconds 10
-                $loopCount++
-            } while ($loopCount -lt $maxLoops)
+            $response = $this.InvokeWithRetry({
+                Invoke-LLMChatCompletion `
+                    -Provider $this.LLMProvider `
+                    -SystemPrompt $this.Prompt `
+                    -UserPrompt $userinput `
+                    -Temperature $this.Temperature `
+                    -TopP $this.TopP `
+                    -MaxTokens $script:MaxTokens `
+                    -Stream $script:GlobalState.Stream `
+                    -LogFolder $script:GlobalState.TeamDiscussionDataFolder `
+                    -DeploymentChat $script:DeploymentChat `
+                    -ollamaModel $script:ollamaModel
+            })
 
             if (-not $script:GlobalState.Stream) {
                 #write-host ($response | convertto-json -Depth 100)
@@ -384,7 +403,7 @@ class ProjectTeam {
             return $responseWithFeedback
         }
     }
-    
+
     [string] Feedback([ProjectTeam] $AssessedExpert, [string] $Expertinput) {
         Show-Header -HeaderText "Feedback by $($this.Name) ($($this.Role)) for $($AssessedExpert.name)"
         # Log the input
