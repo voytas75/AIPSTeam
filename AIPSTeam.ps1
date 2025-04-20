@@ -1350,7 +1350,7 @@ function Update-GlobalStateWithResponse {
             Write-VerboseWrapper $_savedFile
         }
         else {
-            Write-Warning "!! The code does not exist. Unable to update the last code and file version."
+            Write-VerboseWrapper "!! The code does not exist. Unable to update the last code and file version."
         }
     }
     catch [System.Exception] {
@@ -1650,8 +1650,21 @@ function Invoke-LLMChatCompletion {
     try {
         # Check if verbose prompts are enabled and display them
         if ($GlobalState.VerbosePrompt) {
-            Write-Host "System Prompt: $SystemPrompt" -ForegroundColor DarkMagenta
-            Write-Host "User Prompt: $UserPrompt" -ForegroundColor DarkMagenta
+            Write-Host ("=" * 100) -ForegroundColor Cyan
+            Write-Host "=== SYSTEM PROMPT ===" -ForegroundColor DarkMagenta
+            if (![string]::IsNullOrWhiteSpace($SystemPrompt)) {
+                Write-Host $SystemPrompt -ForegroundColor Magenta
+            } else {
+                Write-Host "[Empty System Prompt]" -ForegroundColor DarkGray
+            }
+            Write-Host ("=" * 80)
+            Write-Host "=== USER PROMPT ===" -ForegroundColor DarkMagenta
+            if (![string]::IsNullOrWhiteSpace($UserPrompt)) {
+                Write-Host $UserPrompt -ForegroundColor Magenta
+            } else {
+                Write-Host "[Empty User Prompt]" -ForegroundColor DarkGray
+            }
+            Write-Host ("=" * 100) -ForegroundColor Cyan
         }
 
         # Switch between different LLM providers based on the provider parameter
