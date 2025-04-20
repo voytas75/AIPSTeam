@@ -463,10 +463,10 @@ class ProjectTeam {
             $logEntryLength = $entry.Length
             if ($logEntryLength -gt 100) {
                 $_logEntry = $entry.Substring(0, 100) + " ... (truncated, original length $logEntryLength, see log file)"
-                $_logEntry = $_logEntry -replace "\r\n", " "
+                $_logEntry = $_logEntry -replace "\r?\n\s*\r?\n" -replace "\r\n", " " -replace "`n", " "
             }
             else {
-                $_logEntry = $entry -replace "\r\n", " "
+                $_logEntry = $entry -replace "\r?\n\s*\r?\n" -replace "\r\n", " " -replace "`n", " "
             }
             Write-Verbose $_logEntry
             Add-Content -Path $this.LogFilePath -Value $logEntry
@@ -807,6 +807,7 @@ function Export-AndWritePowerShellCodeBlocks {
         [string]$EndDelimiter
     )
     # Define the regular expression pattern to match PowerShell code blocks
+    Write-VerboseWrapper "++ Export-AndWritePowerShellCodeBlocks function"
     
     $pattern = '(?si)' + [regex]::Escape($StartDelimiter) + '(.*?)' + [regex]::Escape($EndDelimiter)
     $codeBlock_ = ""
@@ -836,6 +837,7 @@ function Export-AndWritePowerShellCodeBlocks {
         }
         else {
             Write-Information "-- No code block found in the input string." -InformationAction Continue
+            Write-VerboseWrapper "-- InputString - no code block found: $InputString" -notruncate
             return $false
         }
     }
@@ -1405,13 +1407,12 @@ function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
             
                 # Save the new version of the code to a file
                 $_savedFile = Export-AndWritePowerShellCodeBlocks -InputString $powerShellDeveloperResponce -OutputFilePath $(Join-Path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
-                Write-VerboseWrapper $_savedFile
-            
+                Write-VerboseWrapper "++ Saved file: $_savedFile"
                 if ($null -ne $_savedFile -and $_savedFile -ne $false) {
                     # Update the last code and file version
                     $GlobalState.lastPSDevCode = Get-Content -Path $_savedFile -Raw 
                     $GlobalState.FileVersion += 1
-                    Write-VerboseWrapper $GlobalState.lastPSDevCode
+                    Write-VerboseWrapper "++ Updated code: $($GlobalState.lastPSDevCode)"
                 }
                 else {
                     Write-Information "-- No valid file to update the last code and file version."
@@ -2909,33 +2910,40 @@ Return only the numerical score (e.g., 0.50). Do not include explanations or com
 function Write-VerboseWrapper {
     <#
     .SYNOPSIS
-        Writes a verbose message to the console after checking and truncating it if it exceeds 150 characters.
+        Writes a verbose message to the console after checking and optionally truncating it if it exceeds 150 characters.
 
     .DESCRIPTION
         This function takes a string message as input and writes it to the console using Write-Verbose.
-        If the message exceeds 150 characters, it is truncated and "...(truncated, original length <length>)" is appended to the end.
+        If the message exceeds 150 characters and the -notruncate switch is not set, it is truncated and "...(truncated, original length <length>)" is appended to the end.
 
     .PARAMETER Message
         The message to be written to the console.
+
+    .PARAMETER NoTruncate
+        If set, the message will not be truncated even if it exceeds 150 characters.
 
     .EXAMPLE
         Write-VerboseWrapper -Message "This is a very long message that exceeds 150 characters and needs to be truncated."
     #>
     param (
         [Parameter(Mandatory=$true)]
-        [string]$Message
+        [string]$Message,
+        [switch]$NoTruncate
     )
-    if ($Message.Length -gt 150) {
+    if ($Message.Length -gt 150 -and -not $NoTruncate) {
         $verboseMessage = "$($Message.Substring(0, 100))...(truncated, original length $($Message.Length))"
     }
     else {
         $verboseMessage = $Message
     }
-    $verboseMessage = $verboseMessage -replace "\r\n", " "
+    if ($NoTruncate) {
+        $verboseMessage = $Message
+    }
+    else {
+        $verboseMessage = $verboseMessage -replace "\r?\n\s*\r?\n" -replace "\r\n", " " -replace "`n", " "
+    }
     Write-Verbose -Message $verboseMessage
 }
-
-
 #endregion Functions
 
 #region Setting Up
