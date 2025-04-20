@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - serper API integration (https://serper.dev/).
 - docs update.
 - updated verbose logging to use a wrapper function for better message handling and truncation.
+- changes to class `ProjectTeam`.
 
 ## [3.10.1] - 2025.04.16
 
