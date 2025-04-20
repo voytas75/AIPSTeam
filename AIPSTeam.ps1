@@ -203,8 +203,10 @@ class ProjectTeam {
         $this.LLMProvider = "AzureOpenAI"  # Default to AzureOpenAI, can be changed as needed
     }
 
-    [string] InvokeWithRetry([scriptblock] $call, [int] $max=5, [int] $delay=2) {
-        for ($i = 0; $i -lt $max; $i++) {
+    [string] InvokeWithRetry([scriptblock] $call) {
+        $max   = 5
+        $delay = 2
+        for ($i=0; $i -lt $max; $i++) {
             try {
                 $resp = & $call
                 if (-not [string]::IsNullOrEmpty($resp)) { return $resp }
@@ -255,7 +257,7 @@ class ProjectTeam {
     }
     
     # Method to process the input and generate a response
-    [string] ProcessInput([string] $userinput) {
+    [string] ProcessInput2([string] $userinput) {
         Show-Header -HeaderText "Current Expert: $($this.Name) ($($this.Role))"
         # Log the input
         $this.AddLogEntry("Processing input: $userinput")
@@ -321,7 +323,7 @@ class ProjectTeam {
         }
     }
 
-    [string] ProcessInput([string] $userinput, [string] $systemprompt) {
+    [string] ProcessInput2([string] $userinput, [string] $systemprompt) {
         Show-Header -HeaderText "Processing Input by $($this.Name) ($($this.Role))"
         # Log the input
         $this.AddLogEntry("Processing input: $userinput")
@@ -402,6 +404,76 @@ class ProjectTeam {
             Write-VerboseWrapper "No next expert available. Returning the response with feedback."
             return $responseWithFeedback
         }
+    }
+
+    [string] ProcessInput(
+        [string] $UserInput,
+        [string] $SystemPrompt = $null
+    ) {
+        if ([string]::IsNullOrWhiteSpace($UserInput)) {
+            throw "UserInput cannot be empty."
+        }
+        if ([string]::IsNullOrWhiteSpace($SystemPrompt)) {
+            $effectivePrompt = $this.Prompt
+        } else {
+            $effectivePrompt = $SystemPrompt
+        }        Show-Header -HeaderText "Expert: $($this.Name) ($($this.Role))"
+        $this.Status = "In Progress"
+        $this.AddLogEntry("Input: $($UserInput -replace '\r?\n',' ' )")
+    
+        try {
+            # Call LLM with retry/backoff
+            $rawResponse = $this.InvokeWithRetry({
+                Invoke-LLMChatCompletion `
+                    -Provider $this.LLMProvider `
+                    -SystemPrompt $effectivePrompt `
+                    -UserPrompt $UserInput `
+                    -Temperature $this.Temperature `
+                    -TopP $this.TopP `
+                    -MaxTokens $script:MaxTokens `
+                    -Stream $script:GlobalState.Stream `
+                    -LogFolder $script:GlobalState.TeamDiscussionDataFolder `
+                    -DeploymentChat $script:DeploymentChat `
+                    -ollamaModel $script:ollamaModel
+            })
+    
+            if (-not $script:GlobalState.Stream) {
+                Write-Host $rawResponse -ForegroundColor White
+            }
+            $this.AddLogEntry("Response: $($rawResponse -replace '\r?\n',' ' )")
+    
+            # Cap memory to last 100 entries
+            if ($this.ResponseMemory.Count -ge 100) {
+                $this.ResponseMemory.RemoveAt(0)
+            }
+            $this.ResponseMemory.Add([PSCustomObject]@{
+                Response  = $rawResponse
+                Timestamp = (Get-Date)
+            })
+    
+            # Feedback
+            if ($this.FeedbackTeam.Count -gt 0) {
+                $feedback = $this.RequestFeedback($rawResponse)
+                $this.AddLogEntry("Feedback: $($feedback -replace '\r?\n',' ' )")
+                $finalResponse = "$rawResponse`n`n$feedback"
+            } else {
+                $finalResponse = $rawResponse
+            }
+    
+            $this.Status = "Completed"
+        }
+        catch {
+            $err = $_.Exception.Message
+            $this.AddLogEntry("Error: $err")
+            $this.Status = "Error"
+            throw "[$($this.Name)] Processing failed: $err"
+        }
+    
+        # Chain to next expert
+        if ($null -ne $this.NextExpert) {
+            return $this.NextExpert.ProcessInput($finalResponse, $null)
+        }
+        return $finalResponse
     }
 
     [string] Feedback([ProjectTeam] $AssessedExpert, [string] $Expertinput) {
