@@ -6,7 +6,7 @@ param(
     [string]$UserInputFile,
     [string]$ManagerGuidelinesPath,
     [string]$PrimaryDeployment = $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT,
-    [string]$ControlDeployment = 'gpt-4.1',
+    [string]$ControlDeployment = $env:PSAOAI_API_AZURE_OPENAI_CONTROL_DEPLOYMENT,
     [string]$VariantName = 'baseline-current',
     [string]$OutputRoot,
     [int]$MaxTokens = 1200,
@@ -143,7 +143,7 @@ if ([string]::IsNullOrWhiteSpace($PrimaryDeployment)) {
     throw 'PrimaryDeployment was not provided and PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT is empty.'
 }
 if ([string]::IsNullOrWhiteSpace($ControlDeployment)) {
-    throw 'ControlDeployment cannot be empty.'
+    throw 'ControlDeployment cannot be empty. Pass -ControlDeployment or set PSAOAI_API_AZURE_OPENAI_CONTROL_DEPLOYMENT.'
 }
 
 if ([string]::IsNullOrWhiteSpace($AIPSTeamPath)) {
@@ -232,10 +232,10 @@ $comparison = [ordered]@{
         'both deployments produced non-empty content for the selected developer-stage request shape.'
     }
     elseif (($primaryVariant.isEmpty -eq $true) -and ($controlVariant.isEmpty -eq $true)) {
-        'both deployments stayed empty for the selected developer-stage request shape; this weakens the case for a gpt-5.4-only issue.'
+        'both deployments stayed empty for the selected developer-stage request shape; this weakens the case for a primary-deployment-specific issue.'
     }
     else {
-        'primary produced non-empty content while control did not; this does not match the expected gpt-5.4-empty vs gpt-4.1-non-empty control signal.'
+        'primary produced non-empty content while control did not; this does not match the expected primary-empty vs control-non-empty comparison signal.'
     }
 }
 
