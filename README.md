@@ -72,6 +72,9 @@ Supported providers:
 - [LM Studio](https://lmstudio.ai/)
 - [Ollama](https://ollama.com/)
 
+PSAOAI module repo:
+- [PSAOAI](https://github.com/voytas75/PSAOAI)
+
 > [!IMPORTANT]
 > You need Azure OpenAI, Ollama, or LM Studio to use this script.
 
