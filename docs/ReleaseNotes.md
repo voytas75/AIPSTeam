@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [3.10.3] - 2026.03.26 unpublished
+## [3.10.3] - 2026.03.26
 
 - improve WSL/Linux and Azure OpenAI compatibility, including safer environment-variable resolution and cross-platform log path handling.
 - add developer-stage mitigation and debug artifacts for Azure/PSAOAI empty-response investigation.
