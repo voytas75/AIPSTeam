@@ -15,6 +15,7 @@ AIPSTeam is a PowerShell-first AI collaboration script that simulates a small de
 - [5-minute quickstart](#5-minute-quickstart)
 - [What you get](#what-you-get)
 - [Example first-run output](#example-first-run-output)
+- [Representative example artifact](#representative-example-artifact)
 - [Recommended parameters](#recommended-parameters)
 - [Advanced parameters](#advanced-parameters)
 - [Overview](#overview)
@@ -88,6 +89,12 @@ exports results to CSV, and generates basic documentation.
 $prompt | AIPSTeam.ps1 -LLMProvider "AzureOpenAI" -NOInteraction -NORAG -Stream $false
 ```
 
+If you want the most completion-friendly path on heavier models, use the reduced workflow mode:
+
+```powershell
+$prompt | AIPSTeam.ps1 -LLMProvider "AzureOpenAI" -NOInteraction -NORAG -ReducedWorkflow -Stream $false
+```
+
 If you are using another backend, switch only the provider value:
 - `-LLMProvider "ollama"`
 - `-LLMProvider "LMStudio"`
@@ -131,12 +138,20 @@ Draft deliverables
 
 That is the value of AIPSTeam: a more structured project draft than a single one-shot reply.
 
+## Representative example artifact
+
+For a fuller walkthrough, see:
+- [`docs/first-run-example.md`](docs/first-run-example.md)
+
+That file shows a representative first-run scenario, the command used, the shape of the output, and what still needs human review.
+
 ## Recommended parameters
 
 These are the most useful parameters for a realistic first run:
 
 - `userInput` — project outline as a string; can also be piped
 - `-NOInteraction` — run without prompts or menus during the session
+- `-ReducedWorkflow` — run a smaller Manager + Developer flow that skips the heavier later stages
 - `-LLMProvider` — choose the backend: `AzureOpenAI`, `ollama`, or `LMStudio`
 - `-NORAG` — disable retrieval for a simpler first run
 - `-Stream $false` — disable streaming for a cleaner, easier-to-review result
@@ -148,6 +163,7 @@ Use these after the basic flow is already clear:
 
 - `-Stream` — enable or disable live streaming (`$true` by default)
 - `-NOPM` — disable Project Manager functions
+- `-ReducedWorkflow` — keep only the initial Manager → Developer pass and skip the later multi-review stages
 - `-NODocumentator` — disable Documentator functions
 - `-NOLog` — disable logging
 - `-LogFolder` — specify where logs should be stored

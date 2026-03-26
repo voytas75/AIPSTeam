@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 3.10.1
+.VERSION 3.10.3
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,serpapi,RAG,powerHTML
@@ -47,6 +47,9 @@ Disables input check.
 .PARAMETER NOInteraction
 Disables user interaction throughout the session. No questions, no menu.
 
+.PARAMETER ReducedWorkflow
+Runs a smaller workflow focused on Manager and Developer only. Skips the later review/documentation/report stages to improve the chance of completing end-to-end.
+
 .PARAMETER VerbosePrompt
 Shows prompts.
 
@@ -80,7 +83,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.9.2
+Version: 3.10.3
 Author: voytas75
 Creation Date: 05.2024
 
@@ -120,6 +123,9 @@ param(
     [Parameter(HelpMessage = "Disables interaction functionality. There will be no menu after team collaboration workflow. The script will not ask the user any questions and will not require any interaction throughout the whole session.")]
     [switch] $NOInteraction,
 
+    [Parameter(HelpMessage = "Runs a smaller workflow focused on Manager and Developer only. Skips later review/documentation/report stages to improve completion reliability.")]
+    [switch] $ReducedWorkflow,
+
     [Parameter(HelpMessage = "Shows prompts.")]
     [switch] $VerbosePrompt,
 
@@ -127,7 +133,7 @@ param(
     [string] $LogFolder,
 
     [Parameter(HelpMessage = "Specifies the deployment chat environment variable for PSAOAI (AZURE OpenAI).")]
-    [string] $DeploymentChat = [System.Environment]::GetEnvironmentVariable("PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT", "User"),
+    [string] $DeploymentChat,
 
     [Parameter(ParameterSetName = 'LoadStatus', HelpMessage = "Loads the project status from a specified path.")]
     [string] $LoadProjectStatus,
@@ -139,7 +145,79 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPSTeamVersion = "3.10.2"
+$AIPSTeamVersion = "3.10.3"
+
+function Get-EnvValue {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+        [string]$Default = ""
+    )
+
+    $processValue = [System.Environment]::GetEnvironmentVariable($Name, "Process")
+    if (-not [string]::IsNullOrWhiteSpace($processValue)) {
+        return $processValue
+    }
+
+    $userValue = [System.Environment]::GetEnvironmentVariable($Name, "User")
+    if (-not [string]::IsNullOrWhiteSpace($userValue)) {
+        return $userValue
+    }
+
+    $machineValue = [System.Environment]::GetEnvironmentVariable($Name, "Machine")
+    if (-not [string]::IsNullOrWhiteSpace($machineValue)) {
+        return $machineValue
+    }
+
+    return $Default
+}
+
+function Get-DefaultAIPSTeamLogRoot {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ScriptName
+    )
+
+    $documentsPath = [Environment]::GetFolderPath("MyDocuments")
+    if (-not [string]::IsNullOrWhiteSpace($documentsPath)) {
+        return (Join-Path -Path $documentsPath -ChildPath $ScriptName)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($HOME)) {
+        return (Join-Path -Path $HOME -ChildPath $ScriptName)
+    }
+
+    return (Join-Path -Path (Get-Location) -ChildPath $ScriptName)
+}
+
+function Write-AIPSTeamDebugArtifact {
+    param(
+        [Parameter(Mandatory)]
+        [string]$LogFolder,
+        [Parameter(Mandatory)]
+        [string]$Name,
+        [Parameter(Mandatory)]
+        [string]$Content
+    )
+
+    try {
+        if ([string]::IsNullOrWhiteSpace($LogFolder)) {
+            return
+        }
+        if (-not (Test-Path -Path $LogFolder)) {
+            New-Item -ItemType Directory -Path $LogFolder -Force | Out-Null
+        }
+        $path = Join-Path -Path $LogFolder -ChildPath $Name
+        Set-Content -Path $path -Value $Content -Encoding UTF8
+    }
+    catch {
+        Write-VerboseWrapper "Failed to write debug artifact '$Name': $_"
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($DeploymentChat)) {
+    $DeploymentChat = Get-EnvValue -Name "PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT"
+}
 
 #region ProjectTeamClass
 <#
@@ -198,7 +276,7 @@ class ProjectTeam {
         $this.Status = "Not Started"
         $this.Log = @()
         $this.GlobalState = $GlobalState
-        $this.LogFilePath = "$($GlobalState.TeamDiscussionDataFolder)\$name.log"
+        $this.LogFilePath = Join-Path -Path $GlobalState.TeamDiscussionDataFolder -ChildPath "$name.log"
         $this.FeedbackTeam = @()
         $this.LLMProvider = "AzureOpenAI"  # Default to AzureOpenAI, can be changed as needed
     }
@@ -673,6 +751,181 @@ function Test-ModuleMinVersion {
         Write-Error "Module $ModuleName with minimum version $MinimumVersion not found."
         return $false
     }
+}
+
+function Get-AIPSTeamTextWithinLimit {
+    param (
+        [AllowNull()]
+        [string]$Text,
+        [int]$MaxLength = 6000,
+        [string]$Label = "Text"
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return ""
+    }
+
+    $normalized = $Text.Trim()
+    if ($normalized.Length -le $MaxLength) {
+        return $normalized
+    }
+
+    $suffix = "`n`n[$Label truncated to reduce request size. Original length: $($normalized.Length) characters.]"
+    $keepLength = [Math]::Max(0, $MaxLength - $suffix.Length)
+    $trimmed = $normalized.Substring(0, $keepLength).TrimEnd()
+    return "$trimmed$suffix"
+}
+
+function New-AIPSTeamDeveloperPrompt {
+    param (
+        [Parameter(Mandatory)]
+        [string]$GuidelinesText,
+        [string]$GuidelinesLabel = "Guidelines",
+        [AllowNull()]
+        [string]$CurrentCode
+    )
+
+    $guidelinesBody = Get-AIPSTeamTextWithinLimit -Text $GuidelinesText -MaxLength 6000 -Label $GuidelinesLabel
+    $prompt = @"
+Write a working PowerShell solution from the requirements below.
+Keep it correct, readable, and reasonably minimal.
+Use PowerShell 5.1+ features only.
+Return exactly these sections:
+1. Script Purpose
+2. PowerShell Code
+3. Usage Example
+4. Notes
+
+${GuidelinesLabel}:
+````````text
+$guidelinesBody
+````````
+"@
+
+    if (-not [string]::IsNullOrWhiteSpace($CurrentCode)) {
+        $currentCodeBody = Get-AIPSTeamTextWithinLimit -Text $CurrentCode -MaxLength 12000 -Label 'Current code'
+        $prompt += @"
+
+Current PowerShell code:
+````````powershell
+$currentCodeBody
+````````
+"@
+    }
+
+    return $prompt
+}
+
+function New-AIPSTeamDeveloperFallbackPrompt {
+    param (
+        [Parameter(Mandatory)]
+        [string]$OriginalPrompt
+    )
+
+    $boundedPrompt = Get-AIPSTeamTextWithinLimit -Text $OriginalPrompt -MaxLength 6000 -Label 'Developer input'
+    return @"
+The previous Developer request likely exhausted the completion budget.
+Please answer with a smaller working result based only on the essential requirements below.
+Prefer a correct minimal implementation over extra explanation.
+Return exactly these sections:
+1. Script Purpose
+2. PowerShell Code
+3. Usage Example
+4. Notes
+
+Essential requirements:
+````````text
+$boundedPrompt
+````````
+"@
+}
+
+function Get-AIPSTeamLatestAzureSuccessDiagnostic {
+    param (
+        [string]$LogFolder
+    )
+
+    if ([string]::IsNullOrWhiteSpace($LogFolder) -or -not (Test-Path -Path $LogFolder)) {
+        return $null
+    }
+
+    $responseFile = Get-ChildItem -Path $LogFolder -Filter '*.http-success-response.json' -File -ErrorAction SilentlyContinue |
+        Sort-Object -Property LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+
+    if (-not $responseFile) {
+        return $null
+    }
+
+    try {
+        $response = Get-Content -Path $responseFile.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
+    }
+    catch {
+        return [pscustomobject]@{
+            rawPath = $responseFile.FullName
+            parseError = $_.Exception.Message
+        }
+    }
+
+    $firstChoice = $null
+    if ($null -ne $response.choices -and $response.choices.Count -gt 0) {
+        $firstChoice = $response.choices[0]
+    }
+
+    $messageContent = $null
+    if ($null -ne $firstChoice -and $null -ne $firstChoice.message) {
+        $messageContent = $firstChoice.message.content
+    }
+
+    $usage = $response.usage
+    $completionTokens = $null
+    $totalTokens = $null
+    $reasoningTokens = $null
+    if ($null -ne $usage) {
+        $completionTokens = $usage.completion_tokens
+        $totalTokens = $usage.total_tokens
+        if ($null -ne $usage.completion_tokens_details) {
+            $reasoningTokens = $usage.completion_tokens_details.reasoning_tokens
+        }
+    }
+
+    return [pscustomobject]@{
+        rawPath = $responseFile.FullName
+        finishReason = if ($null -ne $firstChoice) { $firstChoice.finish_reason } else { $null }
+        contentLength = if ($null -ne $messageContent) { $messageContent.Length } else { 0 }
+        completionTokens = $completionTokens
+        totalTokens = $totalTokens
+        reasoningTokens = $reasoningTokens
+    }
+}
+
+function Test-AIPSTeamShouldUseDeveloperFallback {
+    param (
+        [AllowNull()]
+        [string]$Response,
+        [AllowNull()]
+        [object]$Diagnostic
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Response)) {
+        return $true
+    }
+
+    if ($null -eq $Diagnostic) {
+        return $false
+    }
+
+    if (($Diagnostic.finishReason -eq 'length') -and ($Diagnostic.contentLength -eq 0)) {
+        return $true
+    }
+
+    if (($null -ne $Diagnostic.reasoningTokens) -and ($null -ne $Diagnostic.completionTokens) -and ($Diagnostic.contentLength -eq 0)) {
+        if ([int]$Diagnostic.reasoningTokens -ge [int]$Diagnostic.completionTokens) {
+            return $true
+        }
+    }
+
+    return $false
 }
 
 function SendFeedbackRequest {
@@ -1278,36 +1531,7 @@ function Set-FeedbackAndGenerateResponse {
         # Generate the response based on the feedback
         #$responsePrompt = "Modify Powershell code with suggested improvements and optimizations based on $($Reviewer.Name) review. The previous version of the code has been shared below after the feedback block.`n`n````````text`n" + $($Reviewer.GetLastMemory().Response) + "`n`````````n`nHere is previous version of the code:`n`n``````powershell`n$($GlobalState.LastPSDevCode)`n```````n`nShow the new version of PowerShell code. Think step by step. Make sure your answer is unbiased. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks."
 
-        $responsePrompt = @"
-
-Your task is to write next version of PowerShell code based on the following requirements and guidelines. Please follow these steps:
-
-1. Analyze the requirements in the $($Reviewer.Name)'s guidelines provided below.
-2. Plan the structure of your PowerShell script.
-3. Write the PowerShell code that meets the requirements.
-4. Add appropriate error handling and logging.
-5. Include comments explaining complex parts of the code.
-6. Add version notes to document the code changes.
-7. Perform a self-review of your code for efficiency and adherence to best practices.
-
-Please format your response as follows:
-1. Script Purpose: (Brief description of what the script does)
-2. Input Parameters: (List of input parameters, if any)
-3. Output: (Description of what the script returns or produces)
-4. PowerShell Code: (The actual code, properly formatted and commented)
-5. Usage Example: (A brief example of how to use the script)
-6. Self-Review Notes: (Any observations or potential improvements you've identified)
-
-$($Reviewer.Name) Guidelines: 
-````````text
-$($Reviewer.GetLastMemory().Response)
-````````
-
-Current version of the PowerShell code:
-````````powershell
-$($GlobalState.LastPSDevCode)
-````````
-"@
+        $responsePrompt = New-AIPSTeamDeveloperPrompt -GuidelinesText $Reviewer.GetLastMemory().Response -GuidelinesLabel "$($Reviewer.Name) Guidelines" -CurrentCode $GlobalState.LastPSDevCode
         # If a tip amount is specified, include it in the response prompt
         if ($tipAmount) {
             $responsePrompt += "`n`nI will tip you `$$tipAmount for the correct code."
@@ -1736,6 +1960,22 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         Write-VerboseWrapper "Stream: $Stream"
         Write-VerboseWrapper "LogFolder: $LogFolder"
 
+        $systemPromptLength = if ($null -ne $SystemPrompt) { $SystemPrompt.Length } else { 0 }
+        $userPromptLength = if ($null -ne $UserPrompt) { $UserPrompt.Length } else { 0 }
+        $debugMeta = [ordered]@{
+            timestamp = (Get-Date).ToString("o")
+            deployment = $Deployment
+            temperature = $Temperature
+            topP = $TopP
+            maxTokens = $MaxTokens
+            stream = $Stream
+            systemPromptLength = $systemPromptLength
+            userPromptLength = $userPromptLength
+        } | ConvertTo-Json -Depth 5
+        Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-meta.json" -Content $debugMeta
+        Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-system-prompt.txt" -Content $SystemPrompt
+        Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-user-prompt.txt" -Content $UserPrompt
+
         # Notify the start of the Azure OpenAI process
         Write-Host "++ Initiating Azure OpenAI process for deployment: $Deployment..."
         
@@ -1743,9 +1983,77 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
             Write-Host "++ Streaming mode enabled." -ForegroundColor Blue
         }
 
+        $isDeveloperShapedPrompt = ($UserPrompt -match '1\. Script Purpose') -and ($UserPrompt -match '2\. PowerShell Code') -and ($UserPrompt -match '3\. Usage Example')
+        $useDeveloperFallback = ($Deployment -match '^gpt-5(\.|$)') -and $isDeveloperShapedPrompt
+
         # Invoke the Azure OpenAI chat completion function
-        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt -MaxTokens $MaxTokens
         #$response = PSAOAI\Invoke-PSAOAIChatCompletion -usermessage "${SystemPrompt}`n`n${UserPrompt}" -LogFolder $LogFolder -o1 -Deployment "o4-mini" -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+
+        $latestDiagnostic = Get-AIPSTeamLatestAzureSuccessDiagnostic -LogFolder $LogFolder
+        $responseMeta = [ordered]@{
+            timestamp = (Get-Date).ToString("o")
+            isNull = ($null -eq $response)
+            isString = ($response -is [string])
+            stringLength = if ($response -is [string]) { $response.Length } else { $null }
+            responseType = if ($null -ne $response) { $response.GetType().FullName } else { $null }
+            finishReason = if ($null -ne $latestDiagnostic) { $latestDiagnostic.finishReason } else { $null }
+            reasoningTokens = if ($null -ne $latestDiagnostic) { $latestDiagnostic.reasoningTokens } else { $null }
+            completionTokens = if ($null -ne $latestDiagnostic) { $latestDiagnostic.completionTokens } else { $null }
+            rawSuccessResponsePath = if ($null -ne $latestDiagnostic) { $latestDiagnostic.rawPath } else { $null }
+        } | ConvertTo-Json -Depth 5
+        Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-response-meta.json" -Content $responseMeta
+        if ($response -is [string]) {
+            Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-response.txt" -Content $response
+        }
+
+        if ($useDeveloperFallback -and (Test-AIPSTeamShouldUseDeveloperFallback -Response $response -Diagnostic $latestDiagnostic)) {
+            $fallbackPrompt = New-AIPSTeamDeveloperFallbackPrompt -OriginalPrompt $UserPrompt
+            $fallbackReason = if ($null -ne $latestDiagnostic -and $latestDiagnostic.finishReason -eq 'length') { 'finish_reason_length' } elseif ([string]::IsNullOrWhiteSpace($response)) { 'empty_response' } else { 'bounded_retry' }
+            $fallbackMeta = [ordered]@{
+                timestamp = (Get-Date).ToString("o")
+                reason = $fallbackReason
+                deployment = $Deployment
+                systemPromptLength = $systemPromptLength
+                originalUserPromptLength = $userPromptLength
+                fallbackUserPromptLength = $fallbackPrompt.Length
+                finishReason = if ($null -ne $latestDiagnostic) { $latestDiagnostic.finishReason } else { $null }
+                reasoningTokens = if ($null -ne $latestDiagnostic) { $latestDiagnostic.reasoningTokens } else { $null }
+                completionTokens = if ($null -ne $latestDiagnostic) { $latestDiagnostic.completionTokens } else { $null }
+                rawSuccessResponsePath = if ($null -ne $latestDiagnostic) { $latestDiagnostic.rawPath } else { $null }
+            } | ConvertTo-Json -Depth 5
+            Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-fallback-meta.json" -Content $fallbackMeta
+            Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-fallback-user-prompt.txt" -Content $fallbackPrompt
+
+            $fallbackResponseObject = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $fallbackPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -OneTimeUserPrompt -MaxTokens $MaxTokens
+            $fallbackResponse = $null
+            if ($fallbackResponseObject -is [string]) {
+                $fallbackResponse = $fallbackResponseObject.Trim()
+            }
+            elseif ($null -ne $fallbackResponseObject -and $null -ne $fallbackResponseObject.choices -and $fallbackResponseObject.choices.Count -gt 0) {
+                $fallbackResponse = [string]$fallbackResponseObject.choices[0].message.content
+                if (-not [string]::IsNullOrWhiteSpace($fallbackResponse)) {
+                    $fallbackResponse = $fallbackResponse.Trim()
+                }
+            }
+
+            $fallbackDiagnostic = Get-AIPSTeamLatestAzureSuccessDiagnostic -LogFolder $LogFolder
+            $fallbackResponseMeta = [ordered]@{
+                timestamp = (Get-Date).ToString("o")
+                isNull = ($null -eq $fallbackResponse)
+                stringLength = if ($null -ne $fallbackResponse) { $fallbackResponse.Length } else { 0 }
+                finishReason = if ($null -ne $fallbackDiagnostic) { $fallbackDiagnostic.finishReason } else { $null }
+                reasoningTokens = if ($null -ne $fallbackDiagnostic) { $fallbackDiagnostic.reasoningTokens } else { $null }
+                completionTokens = if ($null -ne $fallbackDiagnostic) { $fallbackDiagnostic.completionTokens } else { $null }
+                rawSuccessResponsePath = if ($null -ne $fallbackDiagnostic) { $fallbackDiagnostic.rawPath } else { $null }
+            } | ConvertTo-Json -Depth 5
+            Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-fallback-response-meta.json" -Content $fallbackResponseMeta
+
+            if (-not [string]::IsNullOrWhiteSpace($fallbackResponse)) {
+                $response = $fallbackResponse
+                Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-response.txt" -Content $response
+            }
+        }
 
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
@@ -1755,7 +2063,20 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
 
         # Check if the response is null or empty
         if ([string]::IsNullOrEmpty($response)) {
-            $errorMessage = "The response from Azure OpenAI API is null or empty."
+            $emptyMeta = [ordered]@{
+                timestamp = (Get-Date).ToString("o")
+                reason = "null-or-empty-response"
+                systemPromptLength = $systemPromptLength
+                userPromptLength = $userPromptLength
+                deployment = $Deployment
+                stream = $Stream
+                responseType = if ($null -ne $response) { $response.GetType().FullName } else { $null }
+                finishReason = if ($null -ne $latestDiagnostic) { $latestDiagnostic.finishReason } else { $null }
+                reasoningTokens = if ($null -ne $latestDiagnostic) { $latestDiagnostic.reasoningTokens } else { $null }
+                completionTokens = if ($null -ne $latestDiagnostic) { $latestDiagnostic.completionTokens } else { $null }
+            } | ConvertTo-Json -Depth 5
+            Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-empty-response.json" -Content $emptyMeta
+            $errorMessage = "The response from Azure OpenAI API is null or empty after one simplified fallback attempt."
             Write-Error $errorMessage
             throw $errorMessage
         }
@@ -1769,6 +2090,13 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         # Log the error and rethrow it with additional context
         $functionName = $MyInvocation.MyCommand.Name
         $errorMessage = "Error in ${functionName}: $_"
+        $errorDetails = [ordered]@{
+            timestamp = (Get-Date).ToString("o")
+            function = $functionName
+            errorMessage = $_.Exception.Message
+            fullError = ($_ | Out-String)
+        } | ConvertTo-Json -Depth 6
+        Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-error.json" -Content $errorDetails
         Write-Error $errorMessage
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $LogFolder "ERROR.txt")
         throw $_
@@ -2760,7 +3088,7 @@ function Start-OllamaModel {
         if ($runningModel) {
             Write-Host "++ Model '$runningModel' is already running."
             [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $runningModel, 'user')
-            $script:ollamaModel = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')
+            $script:ollamaModel = Get-EnvValue -Name 'OLLAMA_MODEL'
             return $script:ollamaModel
         }
 
@@ -2773,15 +3101,15 @@ function Start-OllamaModel {
             #$models | ForEach-Object { Write-Host "- $_" }
 
             # Check if the environment variable 'ollama_model' is set
-            if ([System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')) {
-                #$ModelName = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL','user')
-                if ($models -notcontains [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')) {
+            if (Get-EnvValue -Name 'OLLAMA_MODEL') {
+                #$ModelName = Get-EnvValue -Name 'OLLAMA_MODEL'
+                if ($models -notcontains (Get-EnvValue -Name 'OLLAMA_MODEL')) {
                     Write-Host "-- Invalid model name specified in environment variable 'ollama_model'. Please select a model from the list."
                     [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', '', 'user')
                     $ModelName = [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', '', 'user')
                 }
             }
-            $script:ollamaModel = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')
+            $script:ollamaModel = Get-EnvValue -Name 'OLLAMA_MODEL'
             $ModelName = $script:ollamaModel
             # If 'ollama_model' is not set or invalid, prompt the user to select a model
             if (-not $ModelName) {
@@ -2800,7 +3128,7 @@ function Start-OllamaModel {
             Write-Host "++ Starting with $ModelName"
             Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "$ollamaPath run $ModelName" -WindowStyle Minimized
             [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $ModelName, 'user')
-            $script:ollamaModel = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODEL', 'user')
+            $script:ollamaModel = Get-EnvValue -Name 'OLLAMA_MODEL'
             return $ModelName
         }
         else {
@@ -3095,6 +3423,7 @@ if (-not $LoadProjectStatus) {
         NOLog                    = $NOLog
         NODocumentator           = $NODocumentator
         NOPM                     = $NOPM
+        ReducedWorkflow          = $ReducedWorkflow
         RAG                      = $RAG
         Stream                   = $Stream
         LLMProvider              = $LLMProvider
@@ -3103,8 +3432,13 @@ if (-not $LoadProjectStatus) {
 }
 
 # Disabe PSAOAI importing banner
-[System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
 $env:PSAOAI_BANNER = "0"
+try {
+    [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
+}
+catch {
+    Write-VerboseWrapper "Could not persist PSAOAI_BANNER to user environment; using process environment only."
+}
 
 Show-Banner
 
@@ -3154,7 +3488,7 @@ if (-not $UserInput) {
 
 #region ollama
 if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
-    $script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
+    $script:ollamaEndpoint = Get-EnvValue -Name 'OLLAMA_ENDPOINT'
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
     }
@@ -3202,9 +3536,9 @@ if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
 # Check if the LLM provider is 'lmstudio'
 if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
     # Retrieve the LM Studio API key from the environment variables
-    $script:lmstudioApiKey = [System.Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'user')
+    $script:lmstudioApiKey = Get-EnvValue -Name 'OPENAI_API_KEY'
     # Retrieve the LM Studio API base URL from the environment variables
-    $script:lmstudioApiBase = [System.Environment]::GetEnvironmentVariable('OPENAI_API_BASE', 'user')
+    $script:lmstudioApiBase = Get-EnvValue -Name 'OPENAI_API_BASE'
     $env:OPENAI_API_KEY = $script:lmstudioApiKey
     $env:OPENAI_API_BASE = $script:lmstudioApiBase
     # If the API key is not set, use the default value 'lm-studio' and set it in the environment variables
@@ -3308,6 +3642,7 @@ if ($LoadProjectStatus) {
         Write-VerboseWrapper "`$GlobalState.NOLog: $($GlobalState.NOLog)"
         Write-VerboseWrapper "`$GlobalState.NODocumentator: $($GlobalState.NODocumentator)"
         Write-VerboseWrapper "`$GlobalState.NOPM: $($GlobalState.NOPM)"
+        Write-VerboseWrapper "`$GlobalState.ReducedWorkflow: $($GlobalState.ReducedWorkflow)"
         Write-VerboseWrapper "`$GlobalState.RAG: $($GlobalState.RAG)"
         Write-VerboseWrapper "`$GlobalState.Stream: $($GlobalState.Stream)"
         Write-VerboseWrapper "`$GlobalState.LLMProvider: $($GlobalState.LLMProvider)"
@@ -3325,6 +3660,7 @@ if ($LoadProjectStatus) {
         Write-Host "No Log: $($GlobalState.NOLog)"
         Write-Host "No Documentator: $($GlobalState.NODocumentator)"
         Write-Host "No Project Manager: $($GlobalState.NOPM)"
+        Write-Host "Reduced Workflow: $($GlobalState.ReducedWorkflow)"
         Write-Host "RAG: $($GlobalState.RAG)"
         Write-Host "Stream: $($GlobalState.Stream)"
         Write-Host "LLM Provider: $($GlobalState.LLMProvider)"
@@ -3340,21 +3676,17 @@ else {
     Try {
         # Get the current date and time in the specified format
         $currentDateTime = Get-Date -Format "yyyyMMdd_HHmmss"
-        if (-not [string]::IsNullOrEmpty($GlobalState.LogFolder)) {
-            # Create a folder with the current date and time as the name in the specified log folder path
-            $GlobalState.TeamDiscussionDataFolder = New-FolderAtPath -Path $GlobalState.LogFolder -FolderName $currentDateTime
+        if ([string]::IsNullOrWhiteSpace($GlobalState.LogFolder)) {
+            $GlobalState.LogFolder = Get-DefaultAIPSTeamLogRoot -ScriptName $scriptname
         }
-        else {
-            # Set the log folder path to the user's Documents folder with the script name as a subfolder
-            $GlobalState.LogFolder = Join-Path -Path ([Environment]::GetFolderPath("MyDocuments")) -ChildPath $scriptname
-            if (-not (Test-Path -Path $GlobalState.LogFolder)) {
-                # Create the log folder if it does not exist
-                New-Item -ItemType Directory -Path $GlobalState.LogFolder | Out-Null
-            }
-            Write-Information "++ The logs will be saved in the following folder: $($GlobalState.LogFolder)" -InformationAction Continue
-            # Create a folder with the current date and time as the name in the log folder path
-            $GlobalState.TeamDiscussionDataFolder = New-FolderAtPath -Path $GlobalState.LogFolder -FolderName $currentDateTime
+
+        if (-not (Test-Path -Path $GlobalState.LogFolder)) {
+            New-Item -ItemType Directory -Path $GlobalState.LogFolder -Force | Out-Null
         }
+
+        Write-Information "++ The logs will be saved in the following folder: $($GlobalState.LogFolder)" -InformationAction Continue
+        $GlobalState.TeamDiscussionDataFolder = New-FolderAtPath -Path $GlobalState.LogFolder -FolderName $currentDateTime
+
         if ($GlobalState.TeamDiscussionDataFolder) {
             # Output information about the created team discussion folder
             Write-Information "++ Team discussion folder was created '$($GlobalState.TeamDiscussionDataFolder)'" -InformationAction Continue
@@ -3917,30 +4249,7 @@ $RAGpromptAddon
     $projectManagerFeedback = $projectManager.Feedback($powerShellDeveloper, $projectManagerPrompt)
     Add-ToGlobalResponses $GlobalState $projectManagerFeedback
     $GlobalState.userInput = $projectManagerFeedback
-    $powerShellDeveloperPrompt = @"
-
-Your task is to write PowerShell code based on the following requirements and guidelines. Please follow these steps:
-1. Analyze the $($projectManager.Name)'s guidelines provided below.
-2. Plan the structure of your PowerShell script.
-3. Write the PowerShell code that meets the requirements.
-4. Add appropriate error handling and logging.
-5. Include comments explaining complex parts of the code.
-6. Add version notes to document the code changes.
-7. Perform a self-review of your code for efficiency and adherence to best practices.
-
-Please format your response as follows:
-1. Script Purpose: (Brief description of what the script does)
-2. Input Parameters: (List of input parameters, if any)
-3. Output: (Description of what the script returns or produces)
-4. PowerShell Code: (The actual code, properly formatted and commented)
-5. Usage Example: (A brief example of how to use the script)
-6. Self-Review Notes: (Any observations or potential improvements you've identified)
-
-$($projectManager.Name) Guidelines:
-````````text
-$($($GlobalState.userInput).trim())
-````````
-"@
+    $powerShellDeveloperPrompt = New-AIPSTeamDeveloperPrompt -GuidelinesText $GlobalState.userInput -GuidelinesLabel "$($projectManager.Name) Guidelines"
     if (-not $GlobalState.NOTips) {
         $powerShellDeveloperPrompt += "`n`nNote: There is `$50 tip for this task."
     }
@@ -3952,75 +4261,80 @@ $($($GlobalState.userInput).trim())
     Save-AndUpdateCode -response $powerShellDeveloperResponce -GlobalState $GlobalState
     #endregion PM-PSDev
 
-    #region RA-PSDev
-    if ($GlobalState.NOTips) {
-        Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $powerShellDeveloper -GlobalState $GlobalState
+    if ($GlobalState.ReducedWorkflow) {
+        Write-Information "++ Reduced workflow enabled. Skipping Analyst, Architect, Domain Expert, QA, PSScriptAnalyzer, Documentator, and final Project Manager report stages." -InformationAction Continue
     }
     else {
-        Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 100
-    }
-    #endregion RA-PSDev
-
-    #region SA-PSDev
-    if ($GlobalState.NOTips) {
-        Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $powerShellDeveloper -GlobalState $GlobalState
-    }
-    else {
-        Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 150
-    }
-
-    #endregion SA-PSDev
-
-    #region DE-PSDev
-    if ($GlobalState.NOTips) {
-        Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $powerShellDeveloper -GlobalState $GlobalState
-    }
-    else {
-        Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 200
-    }
-    #endregion DE-PSDev
-
-    #region QAE-PSDev
-    if ($GlobalState.NOTips) {
-        Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $powerShellDeveloper -GlobalState $GlobalState
-    }
-    else {
-        Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 300
-    }
-    #endregion QAE-PSDev
-
-    #region PSScriptAnalyzer
-    Invoke-AnalyzeCodeWithPSScriptAnalyzer -InputString $($powerShellDeveloper.GetLastMemory().Response) -Role $powerShellDeveloper -GlobalState $GlobalState
-    #endregion PSScriptAnalyzer
-
-    #region Doc
-    if (-not $GlobalState.NODocumentator) {
-        if (-not $GlobalState.NOLog) {
-            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode, $null) 
-            $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
+        #region RA-PSDev
+        if ($GlobalState.NOTips) {
+            Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $powerShellDeveloper -GlobalState $GlobalState
         }
         else {
-            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode, $null)
+            Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 100
         }
-        Add-ToGlobalResponses $GlobalState $documentationSpecialistResponce
-    }
-    #endregion Doc
+        #endregion RA-PSDev
 
-    #region PM Project report
-    if (-not $GlobalState.NOPM) {
-        # Example of summarizing all steps,  Log final response to file
-        if (-not $GlobalState.NOLog) {
-            $projectManagerPrompt = "Generate project report without showing the PowerShell code.`n"
-            $projectManagerPrompt += $GlobalState.GlobalResponse -join ", "
-            $projectManagerResponse = $projectManager.ProcessInput($projectManagerPrompt, $null) 
-            $projectManagerResponse | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
+        #region SA-PSDev
+        if ($GlobalState.NOTips) {
+            Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $powerShellDeveloper -GlobalState $GlobalState
         }
         else {
-            $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ", $null)
+            Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 150
         }
-        Add-ToGlobalResponses $GlobalState $projectManagerResponse
+
+        #endregion SA-PSDev
+
+        #region DE-PSDev
+        if ($GlobalState.NOTips) {
+            Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $powerShellDeveloper -GlobalState $GlobalState
+        }
+        else {
+            Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 200
+        }
+        #endregion DE-PSDev
+
+        #region QAE-PSDev
+        if ($GlobalState.NOTips) {
+            Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $powerShellDeveloper -GlobalState $GlobalState
+        }
+        else {
+            Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $powerShellDeveloper -GlobalState $GlobalState -tipAmount 300
+        }
+        #endregion QAE-PSDev
+
+        #region PSScriptAnalyzer
+        Invoke-AnalyzeCodeWithPSScriptAnalyzer -InputString $($powerShellDeveloper.GetLastMemory().Response) -Role $powerShellDeveloper -GlobalState $GlobalState
+        #endregion PSScriptAnalyzer
+
+        #region Doc
+        if (-not $GlobalState.NODocumentator) {
+            if (-not $GlobalState.NOLog) {
+                $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode, $null) 
+                $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
+            }
+            else {
+                $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode, $null)
+            }
+            Add-ToGlobalResponses $GlobalState $documentationSpecialistResponce
+        }
+        #endregion Doc
+
+        #region PM Project report
+        if (-not $GlobalState.NOPM) {
+            # Example of summarizing all steps,  Log final response to file
+            if (-not $GlobalState.NOLog) {
+                $projectManagerPrompt = "Generate project report without showing the PowerShell code.`n"
+                $projectManagerPrompt += $GlobalState.GlobalResponse -join ", "
+                $projectManagerResponse = $projectManager.ProcessInput($projectManagerPrompt, $null) 
+                $projectManagerResponse | Out-File -FilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ProjectSummary.log")
+            }
+            else {
+                $projectManagerResponse = $projectManager.ProcessInput($GlobalState.GlobalResponse -join ", ", $null)
+            }
+            Add-ToGlobalResponses $GlobalState $projectManagerResponse
+        }
+        #endregion PM Project report
     }
-    #endregion PM Project report
 }
 
 #region Menu

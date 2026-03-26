@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.10.3] - 2026.03.26 unpublished
+
+- improve WSL/Linux and Azure OpenAI compatibility, including safer environment-variable resolution and cross-platform log path handling.
+- add developer-stage mitigation and debug artifacts for Azure/PSAOAI empty-response investigation.
+- add `ReducedWorkflow` mode to keep the flow on Manager + Developer when heavier later stages are not reliable.
+- improve the practical first-run path so the reduced workflow can complete and export generated PowerShell code artifacts.
+- docs update.
+
 ## [3.10.2] - 2025.04.20 unpublished
 
 - move check for script update to the beginning of the script.

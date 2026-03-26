@@ -2,3 +2,7 @@
 .temp
 temp/*
 .windsurfrules
+.tmp-*/
+temp/prompt-isolation/
+temp/system-prompt-mode-isolation/
+temp/developer-deployment-comparison/
