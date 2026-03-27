@@ -15,11 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up PowerShell
-        uses: PowerShell/PowerShell@v1
-        with:
-          version: '7.4.x'
-
       - name: Verify required files exist
         shell: pwsh
         run: |
