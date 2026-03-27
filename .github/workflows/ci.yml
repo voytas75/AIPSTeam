@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  smoke:
+    name: PowerShell smoke checks
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PowerShell
+        uses: PowerShell/PowerShell@v1
+        with:
+          version: '7.4.x'
+
+      - name: Verify required files exist
+        shell: pwsh
+        run: |
+          $required = @(
+            'AIPSTeam.ps1',
+            'README.md',
+            'LICENSE'
+          )
+
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Missing required file: $path"
+            }
+          }
+
+      - name: Parse PowerShell sources
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path . -Recurse -Include *.ps1,*.psm1,*.psd1 -File |
+            Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
+
+          if (-not $files) {
+            throw 'No PowerShell source files found.'
+          }
+
+          $failed = @()
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            )
+
+            if ($errors -and $errors.Count -gt 0) {
+              $failed += [PSCustomObject]@{
+                File = $file.FullName
+                Errors = ($errors | ForEach-Object { $_.Message }) -join '; '
+              }
+            }
+          }
+
+          if ($failed.Count -gt 0) {
+            $failed | Format-List | Out-String | Write-Host
+            throw 'PowerShell parse errors detected.'
+          }
+
+          Write-Host "Parsed $($files.Count) PowerShell files successfully."
