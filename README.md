@@ -1,6 +1,6 @@
 # AI PowerShell Team (AIPSTeam) 3.10.4
 
-AIPSTeam helps PowerShell builders and automation engineers turn a project description or existing script into a draft. It simulates a team that can propose requirements, code, documentation and review feedback using Azure OpenAI, Ollama or LM Studio.
+AIPSTeam helps PowerShell builders and automation engineers turn a project description or existing script into a draft. It simulates a team that can propose requirements, code, documentation and review feedback using Azure OpenAI, Ollama, LM Studio or llama.cpp.
 
 **Beta:** generated code requires human review and testing. AIPSTeam does not execute the generated script. Model quality and context size affect the result. Prompts, script contents and retrieved context may be sent to your selected providers; do not include secrets or sensitive data without authorization.
 
@@ -61,7 +61,7 @@ Review the generated script, permissions and assumptions before testing it in a 
 
 ## Documentation
 
-- [Provider configuration](docs/provider-configuration.md): Azure, Ollama and LM Studio setup.
+- [Provider configuration](docs/provider-configuration.md): Azure, Ollama, LM Studio and dedicated llama.cpp setup.
 - [Usage and parameters](docs/usage.md): existing scripts, full workflow, logs and saved projects.
 - [RAG setup](docs/rag.md): optional web search and data handling.
 - [Troubleshooting](docs/troubleshooting.md): installation, provider and output issues.

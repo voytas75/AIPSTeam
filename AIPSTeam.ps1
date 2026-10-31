@@ -145,7 +145,7 @@ param(
     [int] $MaxTokens = 20480,
 
     [Parameter(HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
-    [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
+    [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI", "llama.cpp" )]
     [string]$LLMProvider = "AzureOpenAI",
 
     [Parameter(HelpMessage = "Explicitly enables PSAOAI reasoning-model request handling for Azure calls.")]
@@ -231,7 +231,8 @@ function Write-AIPSTeamDebugArtifact {
     }
 }
 
-if ([string]::IsNullOrWhiteSpace($DeploymentChat)) {
+$script:LlamaCppModelOverride = $DeploymentChat
+if ($LLMProvider -ne 'llama.cpp' -and [string]::IsNullOrWhiteSpace($DeploymentChat)) {
     $DeploymentChat = Get-EnvValue -Name "PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT"
 }
 
@@ -1951,6 +1952,10 @@ function Invoke-LLMChatCompletion {
                 $response = Invoke-AIPSTeamLMStudioChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey $script:lmstudioApiKey -endpoint $script:lmstudioApiBase -Model $script:LMStudioModel
                 return $response
             }
+            "llama.cpp" {
+                $response = Invoke-AIPSTeamLlamaCppChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey $script:llamaCppApiKey -endpoint $script:llamaCppApiBase -Model $script:LlamaCppModel -MaxTokens $MaxTokens
+                return $response
+            }
             "OpenAI" {
                 # Verbose message for unsupported LLM provider
                 Write-VerboseWrapper "Unsupported LLM provider: $Provider."
@@ -2418,6 +2423,72 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
     Write-Host $InfoText
 
     return $response
+}
+
+function Invoke-AIPSTeamLlamaCppChatCompletion {
+    param([string]$SystemPrompt, [string]$UserPrompt, [double]$Temperature,
+        [double]$TopP, [string]$Model, [string]$ApiKey, [string]$endpoint,
+        [ValidateRange(1,2147483647)][int]$MaxTokens = 20480,
+        [ValidateRange(1,3600)][int]$timeoutSec = 240, [bool]$Stream)
+    $client = $null; $request = $null; $httpResponse = $null; $reader = $null
+    try {
+        if ([string]::IsNullOrWhiteSpace($Model)) { throw 'Missing model' }
+        $endpoint = $endpoint.TrimEnd('/') + '/'
+        $headers = @{'Content-Type'='application/json'}
+        if (-not [string]::IsNullOrWhiteSpace($ApiKey) -and $ApiKey -ne '***') {
+            $headers.Authorization = "Bearer $ApiKey"
+        }
+        $bodyJSON = @{model=$Model; messages=@(@{role='system';content=$SystemPrompt},@{role='user';content=$UserPrompt}); temperature=$Temperature; top_p=$TopP; stream=$Stream; max_tokens=$MaxTokens} | ConvertTo-Json -Depth 5
+        if ($Stream) {
+            Add-Type -AssemblyName System.Net.Http
+            $httpClientHandler = [System.Net.Http.HttpClientHandler]::new()
+            $httpClientHandler.AllowAutoRedirect = $false
+            $httpClientHandler.UseCookies = $false
+            $client = [System.Net.Http.HttpClient]::new($httpClientHandler)
+            $client.Timeout = [TimeSpan]::FromSeconds($timeoutSec)
+            if ($headers.Authorization) { $client.DefaultRequestHeaders.Add('Authorization',$headers.Authorization) }
+            $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Post,"${endpoint}chat/completions")
+            $request.Content = [System.Net.Http.StringContent]::new($bodyJSON,[Text.Encoding]::UTF8,'application/json')
+            # Buffered SendAsync bounds the entire response, not only arrival of headers.
+            $httpResponse = $client.SendAsync($request).GetAwaiter().GetResult()
+            if (-not $httpResponse.IsSuccessStatusCode) { throw 'HTTP failure' }
+            $reader = [IO.StreamReader]::new($httpResponse.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
+            $response = ''; $done = $false
+            while ($null -ne ($line = $reader.ReadLine())) {
+                if (-not $line.StartsWith('data:')) { continue }
+                $data = $line.Substring(5).Trim()
+                if ($data -eq '[DONE]') { $done = $true; break }
+                $chunk = $data | ConvertFrom-Json -ErrorAction Stop
+                if ($chunk.error) { throw 'Stream error' }
+                if (@($chunk.choices).Count -gt 0) {
+                    $delta = $chunk.choices[0].delta.content
+                    if ($null -ne $delta -and $delta -isnot [string]) { throw 'Invalid delta' }
+                    $response += $delta
+                }
+            }
+            if (-not $done) { throw 'Incomplete stream' }
+        } else {
+            $result = Invoke-RestMethod -Uri "${endpoint}chat/completions" -Headers $headers -Method POST -Body $bodyJSON -TimeoutSec $timeoutSec -ErrorAction Stop
+            if ($result.error -or @($result.choices).Count -eq 0 -or $result.choices[0].message.content -isnot [string]) { throw 'Invalid response' }
+            $response = $result.choices[0].message.content
+        }
+        if ([string]::IsNullOrWhiteSpace($response)) { throw 'Empty response' }
+        $response = $response.Trim()
+        [void]($this.Log.Add((@{SystemPrompt=$SystemPrompt;UserPrompt=$UserPrompt;Response=$response} | ConvertTo-Json)))
+        [void]($this.AddLogEntry("SystemPrompt: $SystemPrompt"))
+        [void]($this.AddLogEntry("UserPrompt: $UserPrompt"))
+        [void]($this.AddLogEntry("Response: $response"))
+        Write-Host '++ llama.cpp has successfully processed your request.'
+        return $response
+    } catch {
+        # Never pass raw HTTP exception text or credentials to the dispatcher logger.
+        throw '-- llama.cpp chat completion failed. Check model, response, server availability and authentication.'
+    } finally {
+        if ($reader) { $reader.Dispose() }
+        if ($httpResponse) { $httpResponse.Dispose() }
+        if ($request) { $request.Dispose() }
+        if ($client) { $client.Dispose() }
+    }
 }
 
 function Invoke-BingWebSearch {
@@ -3578,7 +3649,7 @@ if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
 #endregion ollama
 
 #region LMStudio
-# LM Studio and authenticated llama.cpp share the OpenAI-compatible adapter.
+# LM Studio retains its separate OpenAI-compatible configuration.
 if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
     $script:LMStudioModel = $null
     $script:lmstudioApiKey = Get-EnvValue -Name 'OPENAI_API_KEY'
@@ -3715,6 +3786,31 @@ catch [System.Exception] {
     Update-ErrorHandling -ErrorRecord $_ -ErrorContext "Setting up documentation and project file paths or checking for script update" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
     return $false
 }
+if ($GlobalState.LLMProvider -eq 'llama.cpp') {
+    $script:LlamaCppModel = $null
+    $script:llamaCppApiKey = [Environment]::GetEnvironmentVariable('LLAMACPP_API_KEY','Process')
+    $script:llamaCppApiBase = [Environment]::GetEnvironmentVariable('LLAMACPP_ENDPOINT','Process')
+    if ([string]::IsNullOrWhiteSpace($script:llamaCppApiBase)) { $script:llamaCppApiBase = 'http://127.0.0.1:8081/v1/' }
+    $script:llamaCppApiBase = $script:llamaCppApiBase.TrimEnd('/') + '/'
+    $headers = @{}
+    if (-not [string]::IsNullOrWhiteSpace($script:llamaCppApiKey) -and $script:llamaCppApiKey -ne '***') { $headers.Authorization = "Bearer $script:llamaCppApiKey" }
+    try {
+        $catalog = Invoke-RestMethod -Uri "$($script:llamaCppApiBase)models" -Headers $headers -Method GET -TimeoutSec 30 -ErrorAction Stop
+        $models = @($catalog.data | Where-Object { $_.id -is [string] -and -not [string]::IsNullOrWhiteSpace($_.id) })
+        if ($models.Count -eq 0) { throw 'No valid models' }
+        $script:LlamaCppModel = $models[0].id
+        if (-not [string]::IsNullOrWhiteSpace($script:LlamaCppModelOverride)) {
+            if ($script:LlamaCppModelOverride -cnotin @($models | ForEach-Object {$_.id})) { throw 'Model override not advertised' }
+            $script:LlamaCppModel = $script:LlamaCppModelOverride
+        }
+        Write-Host '++ llama.cpp server is running.'
+    } catch {
+        $script:LlamaCppModel = $null
+        Write-Warning '-- llama.cpp model discovery failed. Load a model and check endpoint, model override and authentication.'
+        return
+    }
+}
+
 #endregion Setting Up
 
 #region ProjectTeam

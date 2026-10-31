@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 This section describes the 3.10.4 release source; it does not record a Gallery publication date. Script metadata, help and runtime version are 3.10.4. PSAOAI >= 0.7.0 is now required both at startup and by #Requires; older installations are intentionally excluded. External dependency names remain in supported PSScriptInfo metadata; the versioned requirement is declared through #Requires, not invented metadata syntax.
 
+- Add dedicated `llama.cpp` provider with Process-only `LLAMACPP_ENDPOINT`/`LLAMACPP_API_KEY`, authenticated model discovery, ordinary JSON/SSE chat parsing and caller `max_tokens`. This local source change leaves version 3.10.4 unchanged; native Windows and live inference qualification and refreshed publication handoff remain separate gates. The previous handoff is obsolete. No CI wiring was changed for the new suite.
 - Add UTF-8 BOM for native Windows PowerShell 5.1 parsing compatibility.
 - Remove unsupported diagnostic JSON parsing options on Windows PowerShell 5.1.
 - Reject whitespace-only Developer responses at the terminal response guard.

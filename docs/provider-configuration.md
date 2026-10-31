@@ -34,34 +34,38 @@ $env:OLLAMA_MODEL = 'your-installed-model'
 
 Replace the model name with one installed locally and ensure a model is already running: the current startup path checks for a running model and returns if none is found. It can select that running model rather than the requested environment value. AIPSTeam also has interactive status/model-selection helpers, but setting `OLLAMA_MODEL` alone does not guarantee model startup. For unattended use, configure and verify the service/model first. Some startup helpers use Windows process launching and User-scoped persistence; do not assume equivalent WSL/Linux behavior.
 
-## LM Studio and llama.cpp
+## LM Studio
 
-The existing `LMStudio` adapter also supports an authenticated llama.cpp OpenAI-compatible server. It reads `OPENAI_API_BASE` and `OPENAI_API_KEY` (Process, User, then Machine), probes only `<base>/models`, and selects the first model ID. No `/v1/` root route is required. Discovery failure or an invalid/empty first model stops startup without reporting readiness.
+The `LMStudio` adapter retains `OPENAI_API_BASE` and `OPENAI_API_KEY` resolution (Process, User, Machine), default `http://localhost:1234/v1/`, first-model discovery, and its existing chat behavior. It does not persist keys or defaults in User settings. For llama.cpp, use the dedicated provider below instead of sharing LM Studio settings.
 
-A real key is sent as `Authorization: Bearer ...` for discovery, non-streaming and streaming requests. An absent/whitespace key or the literal redaction placeholder `***` omits Authorization; `***` is never an actual credential. Any other nonempty value, including `lm-studio`, is sent as a key. Configure local LM Studio without authentication by omitting a real key; ensure no User/Machine key is inherited. The default base is `http://localhost:1234/v1/`. Trailing slashes are normalized. This adapter does not persist keys or defaults in User settings.
+## llama.cpp
 
-Windows PowerShell example for an already configured authenticated llama.cpp server (enter the key locally, not in chat or script files):
+Select `-LLMProvider 'llama.cpp'`. This distinct adapter reads only Process-scoped `LLAMACPP_ENDPOINT` and `LLAMACPP_API_KEY`; it does not inherit `OPENAI_*` settings or write User configuration. The default OpenAI-compatible base is `http://127.0.0.1:8081/v1/` on Windows. Trailing slashes are normalized. Set the base including `/v1/`, not `/models` or `/chat/completions`. WSL localhost may not reach a Windows listener; configure a reachable address yourself without changing server binding or firewall automatically.
+
+Startup requests `<base>models` with a 30-second timeout, never the base/root route. It selects the first nonblank string model ID. An explicit `-DeploymentChat` selects an exactly advertised model ID; do not use an Azure deployment alias. Empty/malformed catalogues, transport/authentication failures or an unadvertised override stop startup without reporting readiness. Saved llama.cpp states re-run discovery after loading; credentials are not saved in project state.
+
+A nonblank key other than the literal placeholder `***` is sent as Bearer Authorization on discovery and both chat paths. Omit the key for an unauthenticated server; no fake credential is generated. Chat uses `chat/completions`, `max_tokens` from the caller's token budget, and a 240-second timeout. Both ordinary JSON and SSE responses are validated; empty content, incomplete streams, malformed data and HTTP failures fail without a success message. SSE is buffered until the bounded HTTP transfer completes, then parsed (not progressive console rendering). Existing class prompt/response logging remains; credentials and raw transport errors are not logged by this adapter.
+
+Windows example for an already configured authenticated server. Enter the key only in your own console:
 
 ```powershell
-$env:OPENAI_API_BASE = 'http://127.0.0.1:8081/v1/'
+$oldEndpoint = [Environment]::GetEnvironmentVariable('LLAMACPP_ENDPOINT', 'Process')
+$oldKey = [Environment]::GetEnvironmentVariable('LLAMACPP_API_KEY', 'Process')
 $secureKey = Read-Host 'llama.cpp API key' -AsSecureString
-$keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
 try {
-    $env:OPENAI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
+    [Environment]::SetEnvironmentVariable('LLAMACPP_ENDPOINT', 'http://127.0.0.1:8081/v1/', 'Process')
+    [Environment]::SetEnvironmentVariable('LLAMACPP_API_KEY', ([pscredential]::new('local', $secureKey)).GetNetworkCredential().Password, 'Process')
+    "Draft a script that summarizes RAM usage." | & ./AIPSTeam.ps1 `
+        -LLMProvider 'llama.cpp' -MaxTokens 2048 -NORAG -ReducedWorkflow -NOInteraction -Stream $false
 } finally {
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer)
+    [Environment]::SetEnvironmentVariable('LLAMACPP_API_KEY', $oldKey, 'Process')
+    [Environment]::SetEnvironmentVariable('LLAMACPP_ENDPOINT', $oldEndpoint, 'Process')
     $secureKey.Dispose()
-    Remove-Variable secureKey, keyPointer
-}
-try {
-    "Draft a script that summarizes RAM usage." | ./AIPSTeam.ps1 `
-        -LLMProvider LMStudio -NORAG -ReducedWorkflow -Stream $false
-} finally {
-    Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
+    Remove-Variable secureKey, oldKey, oldEndpoint
 }
 ```
 
-The key necessarily exists in plaintext in this process environment while running; hidden input avoids putting it in command history, but does not protect it from other processes with access. Use your actual server address and secure server configuration. All mandatory modules still apply. Offline fake-HTTP tests cover this adapter contract, not live inference compatibility or deployment readiness.
+For an unauthenticated server, omit hidden-key input and clear only the Process `LLAMACPP_API_KEY` during the run, restoring its prior value in `finally`. PowerShell does not automatically read `.env`. Hidden input avoids command-history disclosure, not process-environment access or managed plaintext copies; close the console afterward. Mandatory modules still apply. Offline fake-HTTP qualification is not live inference acceptance. The previous publication handoff is obsolete because the product source hash changed; no Windows checkout activation or package refresh is implied.
 
 ## OpenAI parameter value
 
