@@ -45,9 +45,9 @@ Use an absolute path. This mode loads script contents for analysis, enhancement 
 | `VerbosePrompt` | Show prompts; may expose sensitive content. |
 | `LoadProjectStatus` | Load saved state; belongs to the `LoadStatus` parameter set. |
 | `NOUserInputCheck` | Disable input checking. |
-| `AzureReasoningModel` | Candidate 3.10.4: explicit PSAOAI Azure reasoning mode. |
-| `AzureEndpoint` | Candidate 3.10.4: optional Azure endpoint override. |
-| `AzureAPIVersion` | Candidate 3.10.4: optional dated Azure API version override. |
+| `AzureReasoningModel` | explicit PSAOAI Azure reasoning mode. |
+| `AzureEndpoint` | optional Azure endpoint override. |
+| `AzureAPIVersion` | optional dated Azure API version override. |
 
 ## Output and saved projects
 

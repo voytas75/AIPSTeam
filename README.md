@@ -1,4 +1,4 @@
-# AI PowerShell Team (AIPSTeam)
+# AI PowerShell Team (AIPSTeam) 3.10.4
 
 AIPSTeam helps PowerShell builders and automation engineers turn a project description or existing script into a draft. It simulates a team that can propose requirements, code, documentation and review feedback using Azure OpenAI, Ollama or LM Studio.
 
@@ -19,7 +19,14 @@ Install-Module -Name PowerHTML -Scope CurrentUser
 Install-Script -Name AIPSTeam -Scope CurrentUser
 ```
 
-The Gallery release is currently **3.10.3**; this checkout contains the **3.10.4 candidate, not yet published**. `Install-Script` installs the published release, not this candidate. To use the candidate, download or clone this checkout and run `./AIPSTeam.ps1` from its directory after installing the modules above.
+`Install-Script` selects the release available from PowerShell Gallery. To use the latest repository source, install the modules above, then clone the default branch:
+
+```powershell
+git clone https://github.com/voytas75/AIPSTeam.git
+Set-Location AIPSTeam
+```
+
+For an existing checkout, use `git pull --ff-only` from its directory after preserving local changes. Run `./AIPSTeam.ps1` from that directory.
 
 If the installed script is not on `PATH`, locate it with `Get-InstalledScript -Name AIPSTeam` and run the file from its `InstalledLocation`.
 
@@ -37,8 +44,6 @@ $prompt | ./AIPSTeam.ps1 -LLMProvider AzureOpenAI `
     -AzureAPIVersion 'YYYY-MM-DD' `
     -MaxTokens 2048 -NORAG -ReducedWorkflow -NOInteraction -Stream $false
 ```
-
-This candidate example uses explicit Azure options introduced in 3.10.4. For Gallery 3.10.3, configure the endpoint/API version through PSAOAI and omit `-AzureEndpoint` and `-AzureAPIVersion`.
 
 `-ReducedWorkflow` runs Manager → Developer and final PSScriptAnalyzer analysis; it skips intermediate reviews, documentation and reports. Remove it when you want the fuller team workflow. `-NORAG` disables web retrieval, not model calls. Add `-AzureReasoningModel` only if your Azure model needs PSAOAI reasoning-mode handling.
 

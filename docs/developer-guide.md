@@ -17,13 +17,13 @@
 
 Inspect each script's parameters before running it. The release entrypoint is `tools/tests/Invoke-ReleaseCI.ps1`; it coordinates the offline checks. External PSAOAI source in CI is pinned with commit and normalized-file hash guards, without installing or bootstrapping provider modules. Do not remove those guards merely to make a test run.
 
-The 3.10.4 candidate's earlier offline qualification covered Windows PowerShell 5.1 and native PowerShell 7 parser checks, core contracts (37 cases), startup (8), draft/validation (7) and legacy Azure integration (13). These are revision-bound prior results, not a fresh test run performed by the documentation rewrite. Refer to the exact revision's CI before making current release-readiness claims.
+Recorded offline qualification of the 3.10.4 source covered Windows PowerShell 5.1 and native PowerShell 7 parser checks, core contracts (37 cases), startup (8), draft/validation (7) and legacy Azure integration (13). These are revision-bound prior results, not a fresh test run performed by the documentation rewrite. Refer to the exact revision's CI before making current release-readiness claims.
 
 ## Qualification boundaries
 
 Offline function/section tests do not qualify full production startup, every provider, RAG, streaming, full multi-review workflows or generated-code execution. No fresh full analyzer qualification is implied.
 
-A historical native PowerShell 7 canonical live run used real modules and two provider calls with clean final analysis. It covered earlier implementation bytes, not the later metadata/help-updated candidate. Windows PowerShell 5.1 acceptance was offline only. Keep historical live and candidate offline evidence separate.
+A historical native PowerShell 7 canonical live run used real modules and two provider calls with clean final analysis. It covered earlier implementation bytes, not the current release source. Windows PowerShell 5.1 acceptance was offline only. Keep historical live evidence separate from exact-revision offline evidence.
 
 Synthetic complete Process configuration was checked with the active PSAOAI resolvers; missing configuration may still prompt/persist in PSAOAI. Banner suppression is process-only, not persisted to User configuration. Culture/process banner residues and temporary dynamic-module lifecycle were not redesigned.
 
@@ -31,4 +31,4 @@ Draft and validation outcomes describe extraction and static analysis, not produ
 
 ## Release ownership
 
-The checkout contains 3.10.4 as an unpublished candidate; Gallery installation and repository delivery are separate. Publication is a manual maintainer action. Do not record “published” merely because offline checks or CI pass, and do not publish private evidence or local planning files.
+The current release source is 3.10.4; Gallery installation and repository delivery are separate. Publication is a manual maintainer action. Do not record “published” merely because offline checks or CI pass, and do not publish private evidence or local planning files.

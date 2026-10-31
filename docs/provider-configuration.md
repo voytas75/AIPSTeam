@@ -17,7 +17,7 @@ Non-secret configuration names used by PSAOAI/AIPSTeam:
 
 For session configuration, use `$env:NAME` assignments for non-secret values. User-scoped settings persist for later processes; do not assume changing them updates the current process. AIPSTeam's `Get-EnvValue` checks Process, User, then Machine values. Azure dependency resolution remains owned by PSAOAI.
 
-The 3.10.4 candidate accepts `-DeploymentChat`, `-AzureEndpoint` and `-AzureAPIVersion` overrides. Use the endpoint and dated API version your deployment supports, rather than copying an old preview version. Omitted endpoint/version options preserve PSAOAI resolution. These options are not available in the published 3.10.3 script.
+The current release source accepts `-DeploymentChat`, `-AzureEndpoint` and `-AzureAPIVersion` overrides. Use the endpoint and dated API version your deployment supports, rather than copying an old preview version. Omitted endpoint/version options preserve PSAOAI resolution.
 
 `-AzureReasoningModel` explicitly enables PSAOAI reasoning requests, including its medium reasoning effort. It is optional; deployment-name inference and the existing gpt-5-only Developer fallback policy remain unchanged. Options are forwarded to both primary Azure calls and that fallback. Offline coverage does not establish compatibility with every live dated Azure route.
 
