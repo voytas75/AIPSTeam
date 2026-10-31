@@ -2,12 +2,24 @@
 
 [Developer guide](developer-guide.md) · [Release notes](ReleaseNotes.md)
 
-## PowerShellGet tags warning
+## PowerShellGet tags warning and published precedent
 
-The 4000-character warning concerns the generated NuGet package metadata field `<tags>`, not README length, script size or an LLM token limit. PowerShellGet 2.2.5 adds discovered function names to the script's source tags when generating the nuspec.
+The 4000-character warning concerns the generated NuGet metadata `<tags>`, not README length, script size or an LLM token limit. PowerShellGet 2.2.5 adds both `PSFunction_` and `PSCommand_` names. Candidate 3.10.4 has 71 functions and 11 source tags (65 characters joined); its generated tags measure 4703 characters. Removing all source tags would still leave 4637 characters.
 
-The prior offline packaging probe for candidate 3.10.4 measured 4703 characters in generated tags from 71 functions. The source contains 11 tags (65 characters when joined); even removing all of them would leave 4637 characters. Shortening README or removing the few source tags therefore does not resolve this warning.
+On 2026-10-31, the public package downloaded from `https://www.powershellgallery.com/api/v2/package/AIPSTeam/3.10.3` was inspected: the actual nuspec identifies AIPSTeam **3.10.3** and contains **4703** tag characters. This is a published historical precedent, not merely an HTTP 200. The helper warning says some feeds may reject these tags; it is not an absolute demonstrated Gallery limit. The precedent supports conditional manual readiness without function refactoring, product changes, module patches or an alternative packager. It does not guarantee future Gallery acceptance of 3.10.4.
 
-The warning says some NuGet feeds may not accept the generated tags. Actual PowerShell Gallery rejection was **not tested**; the warning alone is not proof that Gallery will reject the candidate. No source or packaging workaround is implemented by this documentation restructuring.
+## Selected manual route and exact bytes
 
-Keep packaging warnings, offline validation and actual upload results separate. Publication remains a manual maintainer step; do not upload as a diagnostic experiment or disclose API keys, private endpoints or raw provider logs.
+Use the existing official **PowerShellGet 2.2.5 `Publish-Script`** with isolated, signed NuGet **6.14.0.116**, already qualified on native Windows PowerShell 5.1 and 7. No installation, restore, trust/security changes or diagnostic upload is required. Publication and API credentials remain exclusively with the maintainer; the assistant does not upload. Candidate 3.10.4 remains **UNPUBLISHED** until verified manual publication.
+
+The approved UTF-8 BOM/LF `AIPSTeam.ps1` has raw SHA256 `4A48A7F06E566FF0D0C6555635FC5B2560A8EC58FCD07D55E13112232D22CE84`. A checkout converted to CRLF has different raw bytes and must not silently replace this payload. Validate metadata version 3.10.4, `#Requires` PSAOAI >= 0.7.0, and whole-source parsing in both native runtimes without executing the product. The public PSAOAI 0.7.0 baseline already meets the selected minimum; no dependency release is needed.
+
+The offline diagnostic package was produced using the installed official metadata helper and NuGet pack, with publisher-typed Tags and ReleaseNotes. Its actual five entries are the script, nuspec and three NuGet infrastructure entries; the packed script hash matches the approved source. External module names are metadata, not generated NuGet dependencies; the versioned PSAOAI minimum remains `#Requires`. Offline packing is not an upload test. `Publish-Script` regenerates its own package rather than uploading this diagnostic nupkg; package hashes may change, and acceptance cannot be guaranteed.
+
+## Immediate preflight and post-upload verification
+
+In a fresh owner console, dot-source the validated handoff helper to retain its process-only tooling configuration. Immediately before manual upload, request `https://www.powershellgallery.com/api/v2/Packages(Id='AIPSTeam',Version='3.10.4')`: only a confirmed HTTP 404 permits continuing. HTTP 200 requires reconciling the existing exact-version record and package; network/authentication errors or ambiguous responses mean stop. The fresh 2026-10-31 404 is a snapshot, not a reservation or future guarantee.
+
+Read the API key with hidden `Read-Host -AsSecureString`, convert only transiently for the official publisher, and clean up in `finally`. Do not use transcripts, literal keys in command history, chat, verbose/debug output or credential files. Plaintext String copies in memory and the publisher's NuGet process argument exposure cannot be eliminated by hidden input.
+
+After manual upload, read back the exact version endpoint and download `https://www.powershellgallery.com/api/v2/package/AIPSTeam/3.10.4`. Inspect actual nuspec id/version, metadata and entry allowlist; extract the script, compare its **raw** SHA256 above, and parse it in both native runtimes without running it. HTTP 200 alone or a successful upload command is not publication verification. With rejection or an ambiguous result, stop and reconcile Gallery state before any retry; do not automatically alter metadata or change the product. Keep private logs, credentials and tooling binaries outside the product package and handoff ZIP.
