@@ -155,7 +155,11 @@ param(
     [string]$AzureEndpoint,
 
     [Parameter(HelpMessage = "Optional dated Azure API version override; omitted uses the existing PSAOAI resolver.")]
-    [string]$AzureAPIVersion
+    [string]$AzureAPIVersion,
+
+    [Parameter(HelpMessage = "Azure API protocol. Responses uses v1; ChatCompletions preserves PSAOAI compatibility.")]
+    [ValidateSet('Responses', 'ChatCompletions')]
+    [string]$AzureAPIProtocol = 'Responses'
 )
 $script:AzureOptions = @{}
 if ($PSBoundParameters.ContainsKey('AzureReasoningModel')) { $script:AzureOptions.ReasoningModel = $AzureReasoningModel }
@@ -305,7 +309,13 @@ class ProjectTeam {
             try {
                 $resp = & $call
                 if (-not [string]::IsNullOrEmpty($resp)) { return $resp }
-            } catch { }
+            } catch {
+                $failure = $_.Exception
+                while ($failure.InnerException -and -not $failure.Data.Contains('AIPSTeamResponses')) { $failure = $failure.InnerException }
+                if ($failure.Data.Contains('AIPSTeamResponses')) {
+                    if (-not $failure.Data['Retryable'] -or $i -eq ($max - 1)) { throw $failure }
+                }
+            }
             Start-Sleep -Seconds ($delay * ($i + 1))
         }
         throw "LLM call failed after $max attempts."
@@ -1178,14 +1188,50 @@ function Export-AndWritePowerShellCodeBlocks {
     # Define the regular expression pattern to match PowerShell code blocks
     Write-VerboseWrapper "++ Export-AndWritePowerShellCodeBlocks function"
     
-    $pattern = '(?si)' + [regex]::Escape($StartDelimiter) + '(.*?)' + [regex]::Escape($EndDelimiter)
+    if ($StartDelimiter -ne '```powershell' -or $EndDelimiter -ne '```') { return $false }
     $codeBlock_ = ""
     try {
-        # Process the entire input string at once
-        if ($InputString -match $pattern) {
-            $matches_ = [regex]::Matches($InputString, $pattern)
-            foreach ($match in $matches_) {
-                $codeBlock = $match.Groups[1].Value.Trim()
+        # Admit only explicit PowerShell fences; headings inside fences are code, not sections.
+        # The developer contract bounds main code by 2. PowerShell Code / 3. Usage Example.
+        # Unknown sectioned or unstructured multi-block replies are ambiguous: retain prior code.
+        $blocks = @(); $headers = @(); $inFence = $false; $language = ''; $body = ''; $section = -1
+        foreach ($line in ($InputString -split '\r?\n')) {
+            if ($line -match '^\s*```([^`]*)\s*$') {
+                if ($inFence) {
+                    if (-not [string]::IsNullOrWhiteSpace($Matches[1])) { return $false }
+                    if ($language -eq 'powershell') { $blocks += @{ section = $section; code = $body.Trim() } }
+                    $inFence = $false; $body = ''
+                }
+                else { $inFence = $true; $language = $Matches[1].Trim().ToLowerInvariant() }
+                continue
+            }
+            if ($inFence) { $body += $line + "`n"; continue }
+            if ($line -match '^\s*(?:#{1,6}\s+)?(?<title>(?:\d+\.\s+|[A-Za-z]).*?)\s*$') {
+                $title = $Matches.title.Trim().TrimEnd(':')
+                if ($line -match '^\s*#{1,6}\s+' -or $title -match '^\d+\.\s+') {
+                    $headers += $title; $section = $headers.Count - 1
+                }
+            }
+        }
+        if ($inFence) { return $false }
+        $main = @(); $usage = @()
+        for ($i = 0; $i -lt $headers.Count; $i++) {
+            if ($headers[$i] -eq '2. PowerShell Code') { $main += $i }
+            if ($headers[$i] -eq '3. Usage Example') { $usage += $i }
+        }
+        if ($headers.Count) {
+            if ($main.Count -ne 1 -or $usage.Count -ne 1 -or $usage[0] -ne ($main[0] + 1)) { return $false }
+            $selected = @($blocks | Where-Object { $_.section -eq $main[0] })
+            # Never silently omit code in an unknown section (purpose/notes are non-code).
+            if (@($blocks | Where-Object { $_.section -ne $main[0] -and $_.section -ne $usage[0] }).Count) { return $false }
+        }
+        else {
+            $selected = @($blocks | Where-Object { -not [string]::IsNullOrWhiteSpace($_.code) })
+            if ($selected.Count -gt 1) { return $false }
+        }
+        if ($selected.Count) {
+            foreach ($block in $selected) {
+                $codeBlock = $block.code.Trim()
                 if (-not [string]::IsNullOrWhiteSpace($codeBlock)) {
                     $codeBlock_ += "# exported $(get-date)`n $codeBlock`n`n"
                 }
@@ -1966,7 +2012,11 @@ function Invoke-LLMChatCompletion {
                 # Verbose message for invoking Azure OpenAI model
                 Write-VerboseWrapper "Invoking Azure OpenAI chat completion function."
                 # Invoke the Azure OpenAI chat completion function
-                $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat -MaxTokens $MaxTokens
+                if ($script:AzureAPIProtocol -eq 'ChatCompletions') {
+                    $response = Invoke-AIPSTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat -MaxTokens $MaxTokens
+                } else {
+                    $response = Invoke-AIPSTeamAzureResponsesCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat -MaxTokens $MaxTokens
+                }
                 return $response
             }
             default {
@@ -1980,10 +2030,141 @@ function Invoke-LLMChatCompletion {
     catch {
         # Log the error and rethrow it with additional context
         $functionName = $MyInvocation.MyCommand.Name
+        $responseFailure = $_.Exception
+        while ($responseFailure.InnerException -and -not $responseFailure.Data.Contains('AIPSTeamResponses')) { $responseFailure = $responseFailure.InnerException }
+        if ($responseFailure.Data.Contains('AIPSTeamResponses')) { throw $responseFailure }
         $errorMessage = "Error in ${functionName}: $_"
         Write-Error $errorMessage
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $LogFolder "ERROR.txt")
         throw $_
+    }
+}
+
+function New-AIPSTeamResponsesError {
+    param([string]$Reason, [int]$Status = 0, $ProviderError, [bool]$Retryable = $false, $OriginalError)
+    $failure = [InvalidOperationException]::new("Azure Responses failed: $Reason")
+    $failure.Data['AIPSTeamResponses'] = $true
+    $failure.Data['Status'] = $Status
+    $failure.Data['Retryable'] = $Retryable
+    $failure.Data['Code'] = $ProviderError.code
+    $failure.Data['Param'] = $ProviderError.param
+    # Trusted in-process diagnostics only: never render/log provider prose or original exceptions.
+    $failure.Data['ProviderError'] = $ProviderError
+    $failure.Data['OriginalError'] = $OriginalError
+    return $failure
+}
+
+function ConvertFrom-AIPSTeamResponsesOutput {
+    param($Response)
+    if ($Response.status -ne 'completed' -or $Response.error) {
+        $reason = if ($Response.status -eq 'incomplete') { 'incomplete' } else { 'response_status' }
+        $failure = New-AIPSTeamResponsesError -Reason $reason -ProviderError $Response.error
+        $failure.Data['ResponseStatus'] = $Response.status
+        $failure.Data['IncompleteReason'] = $Response.incomplete_details.reason
+        $failure.Data['Usage'] = $Response.usage
+        throw $failure
+    }
+    $text = [Text.StringBuilder]::new()
+    foreach ($item in $Response.output) {
+        if ($item.type -eq 'reasoning') { continue }
+        if ($item.type -ne 'message' -or $item.role -ne 'assistant') {
+            throw (New-AIPSTeamResponsesError -Reason 'unsupported_output')
+        }
+        foreach ($part in $item.content) {
+            if ($part.type -eq 'refusal') { throw (New-AIPSTeamResponsesError -Reason 'refusal') }
+            if ($part.type -ne 'output_text' -or $part.text -isnot [string]) {
+                throw (New-AIPSTeamResponsesError -Reason 'unsupported_content')
+            }
+            [void]$text.Append($part.text)
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($text.ToString())) { throw (New-AIPSTeamResponsesError -Reason 'empty_output') }
+    return $text.ToString()
+}
+
+function Invoke-AIPSTeamAzureResponsesCompletion {
+    param([string]$SystemPrompt, [string]$UserPrompt, [string]$Deployment, [int]$MaxTokens, [bool]$Stream, [string]$LogFolder)
+    $endpoint = $script:AzureOptions.Endpoint
+    if ([string]::IsNullOrWhiteSpace($endpoint)) { $endpoint = Get-EnvValue 'PSAOAI_API_AZURE_OPENAI_ENDPOINT' }
+    $key = Get-EnvValue 'PSAOAI_API_AZURE_OPENAI_KEY'
+    if ($key -match '^01000000d08c9ddf') {
+        try {
+            $secureKey = ConvertTo-SecureString -String $key -ErrorAction Stop
+            $key = ([pscredential]::new('Azure', $secureKey)).GetNetworkCredential().Password
+        } catch { throw (New-AIPSTeamResponsesError -Reason 'credential_decode') }
+        finally { if ($secureKey) { $secureKey.Dispose() } }
+    }
+    if ($key -match '[\r\n\x00]') { throw (New-AIPSTeamResponsesError -Reason 'credential_format') }
+    if ([string]::IsNullOrWhiteSpace($Deployment)) { $Deployment = Get-EnvValue 'PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT' }
+    $uri = $null
+    if (-not [Uri]::TryCreate($endpoint, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https' -or $uri.Query -or $uri.Fragment -or $uri.UserInfo -or [string]::IsNullOrWhiteSpace($key) -or $key -eq '***' -or [string]::IsNullOrWhiteSpace($Deployment) -or $MaxTokens -le 0) {
+        throw (New-AIPSTeamResponsesError -Reason 'configuration')
+    }
+    $path = $uri.AbsolutePath.TrimEnd('/')
+    if ($path -notin @('', '/openai/v1', '/openai/v1/responses')) { throw (New-AIPSTeamResponsesError -Reason 'endpoint_path') }
+    $target = $uri.GetLeftPart([UriPartial]::Authority) + '/openai/v1/responses'
+    # Stateless, one-time prompts; no provider-side conversation or persisted response.
+    # Sampling and reasoning effort are model-specific and deliberately not inferred from deployment aliases.
+    $payload = @{model=$Deployment; input=@(@{role='developer';content=$SystemPrompt}, @{role='user';content=$UserPrompt}); max_output_tokens=$MaxTokens; stream=$Stream; store=$false}
+    Add-Type -AssemblyName System.Net.Http
+    # Internal transport seam: an owning caller may supply a factory; normal execution
+    # retains the platform HttpClient, including its default TLS validation.
+    $factory = Get-Variable -Name AIPSTeamResponsesHttpClientFactory -ValueOnly -ErrorAction SilentlyContinue
+    $client = if ($factory -is [scriptblock]) { & $factory } else { [System.Net.Http.HttpClient]::new() }
+    $client.Timeout = [TimeSpan]::FromSeconds(300)
+    $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Post, $target)
+    [void]$request.Headers.TryAddWithoutValidation('api-key', $key)
+    $request.Content = [System.Net.Http.StringContent]::new(($payload | ConvertTo-Json -Depth 10 -Compress), [Text.Encoding]::UTF8, 'application/json')
+    $http = $null; $reader = $null
+    try {
+        $http = $client.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+        if (-not $http.IsSuccessStatusCode) {
+            $raw = $http.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            $providerError = $null
+            try { $providerError = ($raw | ConvertFrom-Json -ErrorAction Stop).error } catch { }
+            $status = [int]$http.StatusCode
+            throw (New-AIPSTeamResponsesError -Reason 'http' -Status $status -ProviderError $providerError -Retryable ($status -in @(408,429,500,502,503,504)))
+        }
+        $responseObject = $null
+        if ($Stream) {
+            $reader = [IO.StreamReader]::new($http.Content.ReadAsStreamAsync().GetAwaiter().GetResult(), [Text.Encoding]::UTF8)
+            $data = [Collections.Generic.List[string]]::new()
+            while ($true) {
+                $line = $reader.ReadLine()
+                if ($null -eq $line -or $line -eq '') {
+                    if ($data.Count) {
+                        $eventObject = ($data -join "`n") | ConvertFrom-Json -ErrorAction Stop
+                        $data.Clear()
+                        if ($eventObject.type -eq 'error') { throw (New-AIPSTeamResponsesError -Reason 'stream_error' -ProviderError $eventObject) }
+                        if ($eventObject.type -in @('response.completed','response.incomplete','response.failed')) {
+                            $responseObject = $eventObject.response
+                            break
+                        }
+                        # Render only text deltas. They never become accepted output until terminal validation.
+                        if ($eventObject.type -eq 'response.output_text.delta') { Write-Host -NoNewline ([string]$eventObject.delta) }
+                    }
+                    if ($null -eq $line) { break }
+                } elseif ($line.StartsWith('data:')) { $data.Add($line.Substring(5).TrimStart(' ')) }
+            }
+            if ($null -eq $responseObject) { throw (New-AIPSTeamResponsesError -Reason 'missing_terminal') }
+            Write-Host ''
+        } else {
+            $responseObject = $http.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json -ErrorAction Stop
+        }
+        $result = ConvertFrom-AIPSTeamResponsesOutput $responseObject
+        $diagnostic = @{protocol='Responses';status=$responseObject.status;usage=$responseObject.usage;outputCharacters=$result.Length}
+        Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name 'azure-responses-meta.json' -Content ($diagnostic | ConvertTo-Json -Depth 10)
+        if ($null -ne $this) { $this.AddLogEntry($result) }
+        return $result
+    } catch {
+        $failure = $_.Exception
+        while ($failure.InnerException -and -not $failure.Data.Contains('AIPSTeamResponses')) { $failure = $failure.InnerException }
+        if ($failure.Data.Contains('AIPSTeamResponses')) { throw $failure }
+        throw (New-AIPSTeamResponsesError -Reason 'transport_or_protocol' -OriginalError $_.Exception)
+    } finally {
+        if ($reader) { $reader.Dispose() }
+        if ($http) { $http.Dispose() }
+        $request.Dispose(); $client.Dispose()
     }
 }
 

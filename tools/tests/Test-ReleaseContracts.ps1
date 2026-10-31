@@ -117,7 +117,7 @@ Case 'D02-malformed' {'{bad' | Set-Content (Join-Path $dir 'fixture.http-success
 Case 'D02-missing-folder' {Check 'null diagnostic' $true ($null -eq (Get-AIPSTeamLatestAzureSuccessDiagnostic (Join-Path $dir 'missing')))}
 Case 'D02-missing-file' {Check 'null diagnostic' $true ($null -eq (Get-AIPSTeamLatestAzureSuccessDiagnostic $dir))}
 $one='```powershell' + "`nWrite-Output 'one'`n" + '```'
-$two=$one + "`n" + '```powershell' + "`nWrite-Output 'two'`n" + '```'
+$two="## 1. Script Purpose`nfixture`n## 2. PowerShell Code`n" + $one + "`n" + '```powershell' + "`nWrite-Output 'two'`n" + '```' + "`n## 3. Usage Example`n"
 Case E01 {Save-AndUpdateCode $one $GlobalState;$file=Join-Path $dir 'TheCode_v1.ps1';Check 'file exists' $true (Test-Path $file);Check 'version once' 2 $GlobalState.FileVersion;Check 'disk equals last code' (Get-Content $file -Raw) $GlobalState.lastPSDevCode;Check 'code preserved' $true ($GlobalState.lastPSDevCode.Contains("Write-Output 'one'"))}
 Case E02 {Save-AndUpdateCode $two $GlobalState;Check 'version once' 2 $GlobalState.FileVersion;$code=$GlobalState.lastPSDevCode;Check 'both blocks ordered' $true ($code.IndexOf("Write-Output 'one'") -ge 0 -and $code.IndexOf("Write-Output 'two'") -gt $code.IndexOf("Write-Output 'one'"));Check 'disk equals last' (Get-Content (Join-Path $dir 'TheCode_v1.ps1') -Raw) $code}
 Case E03 {$r=Export-AndWritePowerShellCodeBlocks 'no block' -OutputFilePath (Join-Path $dir 'none.ps1') -StartDelimiter '```powershell' -EndDelimiter '```';Check 'false return' $false $r;Save-AndUpdateCode 'no block' $GlobalState;Check 'no file' 0 @(Get-ChildItem $dir -File).Count;Check 'unchanged code' 'retained' $GlobalState.lastPSDevCode;Check 'unchanged version' 1 $GlobalState.FileVersion}

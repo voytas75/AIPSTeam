@@ -1,0 +1,28 @@
+## 1. Script Purpose
+
+Display a read-only, point-in-time snapshot of local TCP listening endpoints, showing their local address, port, and state.
+
+## 2. PowerShell Code
+
+```powershell
+# Read-only snapshot of local TCP listening endpoints.
+Get-NetTCPConnection -State Listen |
+    Select-Object -Property LocalAddress, LocalPort, State
+```
+
+## 3. Usage Example
+
+If the script is saved as `LocalTcpListenerSnapshot.ps1`, run it from PowerShell:
+
+```powershell
+.\LocalTcpListenerSnapshot.ps1
+```
+
+## 4. Notes
+
+- **Compatibility:** Requires PowerShell 5.1 or later on Windows with the NetTCPIP module available. Neither command relies on features introduced after PowerShell 5.1.
+- **Permissions:** Uses the current session’s permissions. It does not request elevation; access restrictions remain unchanged.
+- **Scope:** Queries only local TCP listeners. It performs no writes, downloads, remote-host queries, or configuration changes.
+- **Output:** `State` should be `Listen`. Ports may appear multiple times for different addresses or address families. Results can change immediately after retrieval; this is not monitoring or a port scan.
+- **Review status:** The three-line script meets the stated static acceptance criteria. It has not been executed or tested; runtime validation remains pending.
+- **Microsoft documentation:** [`Get-NetTCPConnection`](https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection) documents TCP retrieval and state filtering; [`Select-Object`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/select-object?view=powershell-5.1) documents property selection. 

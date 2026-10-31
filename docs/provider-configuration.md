@@ -6,6 +6,24 @@ Configure one backend before the first run. `-NOInteraction` controls AIPSTeam q
 
 ## Azure OpenAI
 
+AzureOpenAI now defaults to `-AzureAPIProtocol Responses`. It sends a direct REST request to `<resource>/openai/v1/responses` with `api-key`, without a dated `api-version`. `AzureEndpoint` accepts the resource root, `/openai/v1/`, or `/openai/v1/responses`; dated deployment paths, queries and userinfo are rejected, not silently rewritten. The deployment name is the request's `model`. `MaxTokens` maps to `max_output_tokens`, including reasoning tokens.
+
+Responses reads the existing `PSAOAI_API_AZURE_OPENAI_ENDPOINT`, `PSAOAI_API_AZURE_OPENAI_KEY`, and `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT` names, Process → User → Machine. It never prompts for or writes configuration. Windows DPAPI keys created by PSAOAI are decoded in memory; decode failure stops the request. For a temporary key, enter it in your own console with `Read-Host -AsSecureString`, convert only to a Process environment value inside `try`, and restore the old value in `finally`; never paste keys into examples, logs or chat.
+
+`Stream` remains true by default: SSE text deltas are rendered progressively, but only a validated terminal completed response is accepted/logged. Incomplete, failed, refusal, tool-only, malformed, empty and missing-terminal responses fail closed. All assistant `output_text` parts are concatenated in order; reasoning is excluded. Safe usage/status metadata goes to `azure-responses-meta.json`. Transient HTTP 408/429/500/502/503/504 can use the existing outer maximum of five attempts; other Responses failures stop immediately. No automatic Chat fallback is used. Partial streamed text is provisional, not a successful draft.
+
+Responses deliberately omits temperature, top_p and reasoning effort because deployment aliases do not prove model support. `AzureReasoningModel` and `AzureAPIVersion` affect **ChatCompletions only**; they do not alter Responses requests. Existing project-state XML does not persist the protocol: both ordinary and resumed runs use the current invocation's selector (Responses if omitted). Pass `-AzureAPIProtocol ChatCompletions` explicitly to resume using the legacy route.
+
+Official contracts: [Responses guide](https://learn.microsoft.com/azure/foundry/openai/how-to/responses), [REST reference](https://learn.microsoft.com/rest/api/microsoft-foundry/azureopenai/responses), [migration guide](https://learn.microsoft.com/azure/developer/ai/how-to/azure-openai-to-responses). Offline tests do not establish deployment/region/model support or live inference.
+
+### Explicit ChatCompletions compatibility
+
+Use `-AzureAPIProtocol ChatCompletions` for the unchanged PSAOAI caller and its dated endpoint/version, reasoning and existing gpt-5 Developer fallback semantics. Example for an already securely configured backend (not executed):
+
+```powershell
+'Draft a RAM summary script.' | ./AIPSTeam.ps1 -AzureAPIProtocol ChatCompletions -NORAG -ReducedWorkflow -NOInteraction -Stream $false
+```
+
 Use [PSAOAI's current setup instructions](https://github.com/voytas75/PSAOAI) to configure credentials securely. PSAOAI manages the encrypted `PSAOAI_API_AZURE_OPENAI_KEY`; do not manually assign a plaintext key to that variable or commit credentials.
 
 Non-secret configuration names used by PSAOAI/AIPSTeam:

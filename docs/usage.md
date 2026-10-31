@@ -40,7 +40,8 @@ Use an absolute path. This mode loads script contents for analysis, enhancement 
 | `NOLog` | Disable logging functions; do not treat this as comprehensive data sanitization. |
 | `LogFolder` | Custom log/output root. |
 | `DeploymentChat` | Azure deployment override; otherwise resolved from `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`. |
-| `MaxTokens` | Response token limit; default `20480`. The first-run example uses `2048`; too small a limit can truncate code. |
+| `AzureAPIProtocol` | Azure-only: `Responses` (default v1 REST/SSE) or explicit `ChatCompletions` (PSAOAI legacy). Local providers unchanged. Not persisted in project state; repeat the compatibility selector on resume. |
+| `MaxTokens` | Response token limit; default `20480`. Responses uses `max_output_tokens`, covering visible and reasoning tokens. The first-run example uses `2048`; too small a limit can truncate code. |
 | `NOTips` | Disable tips. |
 | `VerbosePrompt` | Show prompts; may expose sensitive content. |
 | `LoadProjectStatus` | Load saved state; belongs to the `LoadStatus` parameter set. |
