@@ -160,7 +160,7 @@ These are the most useful parameters for a realistic first run:
 
 - `userInput` — project outline as a string; can also be piped
 - `-NOInteraction` — run without prompts or menus during the session
-- `-ReducedWorkflow` — run a smaller Manager + Developer flow that skips the heavier later stages
+- `-ReducedWorkflow` — run the initial Manager + Developer pass, skipping intermediate reviews, analysis, documentation and reports while retaining final PSScriptAnalyzer analysis
 - `-LLMProvider` — choose the backend: `AzureOpenAI`, `ollama`, or `LMStudio`
 - `-NORAG` — disable retrieval for a simpler first run
 - `-Stream $false` — disable streaming for a cleaner, easier-to-review result
@@ -191,6 +191,8 @@ These are the most useful parameters for a realistic first run:
 - The smoothest path is to configure exactly one backend first and leave RAG off until the base flow works.
 - PSAOAI/runtime environment issues can be the main source of friction, especially outside the most typical Windows-oriented setup.
 - Advanced parameters are useful, but they are not the right starting point for understanding the tool.
+- Native parser and provider-free function/section regression checks do not qualify full startup, all providers, RAG, streaming or generated scripts. No fresh full analyzer qualification is implied.
+- Project-state save callers check the boolean save result before reporting success. Legacy states missing `LLMProvider` or `ReducedWorkflow` are normalized to `AzureOpenAI` or `$false`, retaining existing fields. These saves are not atomic and provide no data-loss protection guarantee; keep independent backups.
 
 ## Advanced parameters
 
@@ -198,7 +200,7 @@ Use these after the basic flow is already clear:
 
 - `-Stream` — enable or disable live streaming (`$true` by default)
 - `-NOPM` — disable Project Manager functions
-- `-ReducedWorkflow` — keep only the initial Manager → Developer pass and skip the later multi-review stages
+- `-ReducedWorkflow` — skip intermediate multi-review, analysis, documentation and report stages after Manager → Developer; final PSScriptAnalyzer analysis still runs
 - `-NODocumentator` — disable Documentator functions
 - `-NOLog` — disable logging
 - `-LogFolder` — specify where logs should be stored
@@ -386,6 +388,8 @@ If you are new to the project, treat the examples below as **after-first-run** p
   - `PSScriptAnalyzer`
   - `powerHTML`
 
+All three modules are globally mandatory through script `#Requires`, even with `-NORAG` or `-ReducedWorkflow` and regardless of the selected provider.
+
 ## Troubleshooting
 
 - **Module not found**: install the required modules with `Install-Module`
@@ -435,3 +439,17 @@ AIPSTeam.ps1 -LLMProvider "ollama"
 ```
 
 For deeper setup and first-run guidance, prefer the sections above before treating this FAQ as the main entry point.
+
+## 3.10.4 release candidate — not published
+
+PSAOAI >= 0.7.0 is mandatory; the runtime check and versioned `#Requires` agree. Windows PowerShell 5.1 and native PowerShell 7 are covered by offline parser, core (37 cases), startup (8), draft/validation (7) and legacy Azure (13) suites. CI uses immutable external PSAOAI source with commit and normalized-file hash guards, without installing or bootstrapping provider modules; remote CI is pending separately approved delivery.
+
+`NOInteraction` rejects missing input before prompting unless code or saved state supplies it. Nonempty parseable extraction marks `DraftOutcome=Complete`; absent/empty/unparseable code marks `Incomplete`, retains prior code/version and ends unsuccessfully. Final analysis records `ValidationOutcome=Clean`, `Findings` or `Failed`; failure retains the draft and ends unsuccessfully, while findings are not a clean-analysis guarantee. Saves check success but are non-atomic.
+
+A historical native PowerShell 7 canonical live run used real modules and two provider calls with clean final analysis. It binds to the earlier implementation bytes, not this metadata/help-updated candidate; no new live run is implied. Windows 5.1 acceptance is offline only. Beta drafts still require human review; all providers, RAG, streaming, full multi-review workflows and generated-code execution are not qualified. Culture/process banner residues and temporary dynamic-module lifecycle are not redesigned. Raw diagnostics can echo provider content and remain private; masking is not comprehensive sanitization.
+
+### Explicit Azure legacy options
+
+`-AzureReasoningModel`, `-AzureEndpoint` and `-AzureAPIVersion` optionally forward PSAOAI reasoning mode, endpoint and dated API version to both primary and existing Developer fallback calls. Omitted options preserve PSAOAI defaults/environment resolution; deployment-name inference and the gpt-5-only fallback policy are unchanged. Explicit reasoning uses the PSAOAI reasoning body, including its medium reasoning effort.
+
+Banner suppression is process-only, not persisted to User configuration. Complete synthetic Process configuration is covered offline with the original active PSAOAI resolvers; missing configuration can still prompt/persist in PSAOAI, so `NOInteraction` is not a fail-closed dependency configuration guarantee. Native offline tests do not verify the live dated Azure route or full provider compatibility.

@@ -8,59 +8,49 @@ on:
 
 jobs:
   smoke:
-    name: PowerShell smoke checks
+    name: PowerShell smoke checks (${{ matrix.shell }})
     runs-on: windows-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Verify required files exist
-        shell: pwsh
+      - name: Checkout pinned PSAOAI source (no module import or installation)
+        uses: actions/checkout@v4
+        with:
+          repository: voytas75/PSAOAI
+          ref: 6a19493e954214dfb193733edbaebd6922a23c4d
+          path: .ci/PSAOAI
+          persist-credentials: false
+      - name: Allocate unique evidence root
+        shell: ${{ matrix.shell }}
         run: |
-          $required = @(
-            'AIPSTeam.ps1',
-            'README.md',
-            'LICENSE'
-          )
-
-          foreach ($path in $required) {
-            if (-not (Test-Path -LiteralPath $path)) {
-              throw "Missing required file: $path"
+          $psaoai = Join-Path $env:RUNNER_TEMP ('psaoai-' + [guid]::NewGuid().ToString('N'))
+          Move-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE '.ci/PSAOAI') -Destination $psaoai
+          "PSAOAI_SOURCE=$psaoai" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $root = Join-Path $env:RUNNER_TEMP ('aipsteam-' + [guid]::NewGuid().ToString('N'))
+          "AIPSTEAM_EVIDENCE=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Required files, whole-source parsing and provider-free contracts
+        shell: ${{ matrix.shell }}
+        run: |
+          $exe = (Get-Process -Id $PID).Path
+          & $exe -NoProfile -NonInteractive -File ./tools/tests/Invoke-ReleaseCI.ps1 -RepositoryRoot $env:GITHUB_WORKSPACE -EvidenceRoot $env:AIPSTEAM_EVIDENCE -PSAOAIPath $env:PSAOAI_SOURCE
+          if ($LASTEXITCODE -ne 0) { throw "Local CI checks failed: $LASTEXITCODE" }
+      - name: Require evidence reports
+        if: always()
+        shell: ${{ matrix.shell }}
+        run: |
+          foreach ($report in @('psaoai-pin.json', 'whole-source-parser.json', 'parser.json', 'runner-results.json', 'contracts/results.json', 'contracts.log', 'startup/summary.json', 'startup.log', 'draft/summary.json', 'draft.log', 'legacy/summary.json', 'legacy.log')) {
+            if (-not $env:AIPSTEAM_EVIDENCE -or -not (Test-Path -LiteralPath (Join-Path $env:AIPSTEAM_EVIDENCE $report))) {
+              throw "Missing evidence report: $report"
             }
           }
-
-      - name: Parse PowerShell sources
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem -Path . -Recurse -Include *.ps1,*.psm1,*.psd1 -File |
-            Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
-
-          if (-not $files) {
-            throw 'No PowerShell source files found.'
-          }
-
-          $failed = @()
-          foreach ($file in $files) {
-            $tokens = $null
-            $errors = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile(
-              $file.FullName,
-              [ref]$tokens,
-              [ref]$errors
-            )
-
-            if ($errors -and $errors.Count -gt 0) {
-              $failed += [PSCustomObject]@{
-                File = $file.FullName
-                Errors = ($errors | ForEach-Object { $_.Message }) -join '; '
-              }
-            }
-          }
-
-          if ($failed.Count -gt 0) {
-            $failed | Format-List | Out-String | Write-Host
-            throw 'PowerShell parse errors detected.'
-          }
-
-          Write-Host "Parsed $($files.Count) PowerShell files successfully."
+      - name: Upload receipts and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aipsteam-${{ matrix.shell }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.AIPSTEAM_EVIDENCE }}
+          if-no-files-found: error

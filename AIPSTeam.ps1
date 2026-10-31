@@ -1,5 +1,5 @@
-<#PSScriptInfo
-.VERSION 3.10.3
+﻿<#PSScriptInfo
+.VERSION 3.10.4
 .GUID f0f4316d-f106-43b5-936d-0dd93a49be6b
 .AUTHOR voytas75
 .TAGS ai,psaoai,llm,project,team,gpt,ollama,azure,serpapi,RAG,powerHTML
@@ -9,7 +9,7 @@
 .RELEASENOTES https://github.com/voytas75/AIPSTeam/blob/master/docs/ReleaseNotes.md
 #>
 
-#Requires -Modules PSAOAI
+#Requires -Modules @{ ModuleName = 'PSAOAI'; ModuleVersion = '0.7.0' }
 #Requires -Modules PSScriptAnalyzer
 #Requires -Modules PowerHTML
 
@@ -48,7 +48,7 @@ Disables input check.
 Disables user interaction throughout the session. No questions, no menu.
 
 .PARAMETER ReducedWorkflow
-Runs a smaller workflow focused on Manager and Developer only. Skips the later review/documentation/report stages to improve the chance of completing end-to-end.
+Runs the initial Manager and Developer pass, skipping intermediate reviews, analysis, documentation and reports. Final PSScriptAnalyzer analysis is retained.
 
 .PARAMETER VerbosePrompt
 Shows prompts.
@@ -83,9 +83,12 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPSTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 3.10.3
+Version: 3.10.4
 Author: voytas75
 Creation Date: 05.2024
+PSAOAI, PSScriptAnalyzer and PowerHTML are globally mandatory #Requires modules, including NORAG and ReducedWorkflow runs.
+Save callers report success only when Save-ProjectState returns true; legacy states missing LLMProvider or ReducedWorkflow receive AzureOpenAI or false defaults. Saves are not atomic and do not guarantee protection against data loss.
+Beta output remains a draft requiring human review. Parser and provider-free function/section checks do not qualify full startup, all providers, RAG, streaming or generated scripts.
 
 .LINK
 https://www.powershellgallery.com/packages/AIPSTeam
@@ -123,7 +126,7 @@ param(
     [Parameter(HelpMessage = "Disables interaction functionality. There will be no menu after team collaboration workflow. The script will not ask the user any questions and will not require any interaction throughout the whole session.")]
     [switch] $NOInteraction,
 
-    [Parameter(HelpMessage = "Runs a smaller workflow focused on Manager and Developer only. Skips later review/documentation/report stages to improve completion reliability.")]
+    [Parameter(HelpMessage = "Runs Manager and Developer, skipping intermediate review/analysis/documentation/report stages; final PSScriptAnalyzer analysis remains enabled.")]
     [switch] $ReducedWorkflow,
 
     [Parameter(HelpMessage = "Shows prompts.")]
@@ -143,9 +146,22 @@ param(
 
     [Parameter(HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
-    [string]$LLMProvider = "AzureOpenAI"
+    [string]$LLMProvider = "AzureOpenAI",
+
+    [Parameter(HelpMessage = "Explicitly enables PSAOAI reasoning-model request handling for Azure calls.")]
+    [switch]$AzureReasoningModel,
+
+    [Parameter(HelpMessage = "Optional Azure endpoint override; omitted uses the existing PSAOAI resolver.")]
+    [string]$AzureEndpoint,
+
+    [Parameter(HelpMessage = "Optional dated Azure API version override; omitted uses the existing PSAOAI resolver.")]
+    [string]$AzureAPIVersion
 )
-$AIPSTeamVersion = "3.10.3"
+$script:AzureOptions = @{}
+if ($PSBoundParameters.ContainsKey('AzureReasoningModel')) { $script:AzureOptions.ReasoningModel = $AzureReasoningModel }
+if ($PSBoundParameters.ContainsKey('AzureEndpoint')) { $script:AzureOptions.Endpoint = $AzureEndpoint }
+if ($PSBoundParameters.ContainsKey('AzureAPIVersion')) { $script:AzureOptions.APIVersion = $AzureAPIVersion }
+$AIPSTeamVersion = "3.10.4"
 
 function Get-EnvValue {
     param(
@@ -858,7 +874,7 @@ function Get-AIPSTeamLatestAzureSuccessDiagnostic {
     }
 
     try {
-        $response = Get-Content -Path $responseFile.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
+        $response = Get-Content -Path $responseFile.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
     }
     catch {
         return [pscustomobject]@{
@@ -1067,7 +1083,11 @@ function Get-LatestVersion {
     }
     catch [System.Exception] {
         $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        $logFilePath = $null
+        if ($GlobalState.TeamDiscussionDataFolder) {
+            $logFilePath = Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt"
+        }
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath $logFilePath
         return $null
     }
 }
@@ -1093,7 +1113,11 @@ function Get-CheckForScriptUpdate {
     }
     catch [System.Exception] {
         $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        $logFilePath = $null
+        if ($GlobalState.TeamDiscussionDataFolder) {
+            $logFilePath = Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt"
+        }
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath $logFilePath
     }
 
 }
@@ -1161,7 +1185,15 @@ function Export-AndWritePowerShellCodeBlocks {
             $matches_ = [regex]::Matches($InputString, $pattern)
             foreach ($match in $matches_) {
                 $codeBlock = $match.Groups[1].Value.Trim()
-                $codeBlock_ += "# exported $(get-date)`n $codeBlock`n`n"
+                if (-not [string]::IsNullOrWhiteSpace($codeBlock)) {
+                    $codeBlock_ += "# exported $(get-date)`n $codeBlock`n`n"
+                }
+            }
+            $parseTokens = $null; $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseInput($codeBlock_, [ref]$parseTokens, [ref]$parseErrors)
+            if ([string]::IsNullOrWhiteSpace($codeBlock_) -or $parseErrors.Count -gt 0) {
+                Write-Information "-- Incomplete draft: no nonempty parseable PowerShell code was extracted." -InformationAction Continue
+                return $false
             }
             if ($OutputFilePath) {
                 $codeBlock_ | Out-File -FilePath $OutputFilePath -Append -Encoding UTF8
@@ -1216,10 +1248,10 @@ function Invoke-CodeWithPSScriptAnalyzer {
 
         # Run PSScriptAnalyzer on the file or script block
         if ($FilePath) {
-            $analysisResults = Invoke-ScriptAnalyzer -Path $FilePath -Severity Warning, Error
+            $analysisResults = Invoke-ScriptAnalyzer -Path $FilePath -Severity Warning, Error -ErrorAction Stop
         }
         elseif ($ScriptBlock) {
-            $analysisResults = Invoke-ScriptAnalyzer -ScriptDefinition $ScriptBlock -Severity Warning, Error
+            $analysisResults = Invoke-ScriptAnalyzer -ScriptDefinition $ScriptBlock -Severity Warning, Error -ErrorAction Stop
         }
         else {
             throw "No FilePath or ScriptBlock provided for analysis."
@@ -1238,9 +1270,11 @@ function Invoke-CodeWithPSScriptAnalyzer {
     }
     catch [System.Exception] {
         $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        $analysisError = $_
+        $analysisLogPath = $null
+        if ($GlobalState -and $GlobalState.TeamDiscussionDataFolder) { $analysisLogPath = Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt" }
+        try { Update-ErrorHandling -ErrorRecord $analysisError -ErrorContext "$functionName function" -LogFilePath $analysisLogPath } finally { throw $analysisError }
     }
-    return $false
 }
 
 function Show-Header {
@@ -1565,7 +1599,8 @@ function Update-GlobalStateWithResponse {
         # Save the new version of the code to a file
         $_savedFile = Export-AndWritePowerShellCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).ps1") -StartDelimiter '```powershell' -EndDelimiter '```'
 
-        if ((Test-Path -Path $_savedFile) -and $_savedFile) {
+        if ($_savedFile -and (Test-Path -Path $_savedFile)) {
+            $GlobalState | Add-Member -MemberType NoteProperty -Name DraftOutcome -Value 'Complete' -Force
             # Update the last code and file version
             $GlobalState.lastPSDevCode = Get-Content -Path $_savedFile -Raw
             $GlobalState.fileVersion += 1
@@ -1574,10 +1609,13 @@ function Update-GlobalStateWithResponse {
             Write-VerboseWrapper $_savedFile
         }
         else {
+            $GlobalState | Add-Member -MemberType NoteProperty -Name DraftOutcome -Value 'Incomplete' -Force
+            Write-Information "-- Incomplete draft: prior code and version retained." -InformationAction Continue
             Write-VerboseWrapper "!! The code does not exist. Unable to update the last code and file version."
         }
     }
     catch [System.Exception] {
+        $GlobalState | Add-Member -MemberType NoteProperty -Name DraftOutcome -Value 'Incomplete' -Force
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
@@ -1751,12 +1789,14 @@ function Save-ProjectState {
     )
     try {
         # Export the project state to a file in XML format
-        $GlobalState | Export-Clixml -Path $FilePath
+        $GlobalState | Export-Clixml -Path $FilePath -ErrorAction Stop
+        return $true
     }    
     catch [System.Exception] {
         # Handle any exceptions that occur during the save process
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        return $false
     }
 }
 
@@ -1770,7 +1810,10 @@ function Get-ProjectState {
             # Import the project state from the XML file
             $projectState = Import-Clixml -Path $FilePath
             if ($null -eq $projectState.LLMProvider) {
-                $projectState.LLMProvider = "AzureOpenAI"
+                $projectState | Add-Member -MemberType NoteProperty -Name LLMProvider -Value "AzureOpenAI" -Force
+            }
+            if ($null -eq $projectState.PSObject.Properties['ReducedWorkflow']) {
+                $projectState | Add-Member -MemberType NoteProperty -Name ReducedWorkflow -Value $false
             }
             # Return the updated GlobalState object
             return $projectState
@@ -1986,8 +2029,10 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         $isDeveloperShapedPrompt = ($UserPrompt -match '1\. Script Purpose') -and ($UserPrompt -match '2\. PowerShell Code') -and ($UserPrompt -match '3\. Usage Example')
         $useDeveloperFallback = ($Deployment -match '^gpt-5(\.|$)') -and $isDeveloperShapedPrompt
 
+        $azureCallOptions = @{}
+        if ($null -ne $script:AzureOptions) { $azureCallOptions = $script:AzureOptions }
         # Invoke the Azure OpenAI chat completion function
-        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt -MaxTokens $MaxTokens
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt -MaxTokens $MaxTokens @azureCallOptions
         #$response = PSAOAI\Invoke-PSAOAIChatCompletion -usermessage "${SystemPrompt}`n`n${UserPrompt}" -LogFolder $LogFolder -o1 -Deployment "o4-mini" -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
 
         $latestDiagnostic = Get-AIPSTeamLatestAzureSuccessDiagnostic -LogFolder $LogFolder
@@ -2025,7 +2070,7 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
             Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-fallback-meta.json" -Content $fallbackMeta
             Write-AIPSTeamDebugArtifact -LogFolder $LogFolder -Name "azure-debug-fallback-user-prompt.txt" -Content $fallbackPrompt
 
-            $fallbackResponseObject = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $fallbackPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -OneTimeUserPrompt -MaxTokens $MaxTokens
+            $fallbackResponseObject = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $fallbackPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -OneTimeUserPrompt -MaxTokens $MaxTokens @azureCallOptions
             $fallbackResponse = $null
             if ($fallbackResponseObject -is [string]) {
                 $fallbackResponse = $fallbackResponseObject.Trim()
@@ -2062,7 +2107,7 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         Write-Host "++ Azure OpenAI process initiated successfully for deployment: $Deployment."
 
         # Check if the response is null or empty
-        if ([string]::IsNullOrEmpty($response)) {
+        if ([string]::IsNullOrWhiteSpace($response)) {
             $emptyMeta = [ordered]@{
                 timestamp = (Get-Date).ToString("o")
                 reason = "null-or-empty-response"
@@ -3386,8 +3431,8 @@ $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
 # Set the current UI culture to 'en-US' for consistent behavior
 [void]([Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US'))
 
-# Check if the PSAOAI module version is at least 0.3.2
-$minVersion = [version]"0.3.2"
+# Check if the PSAOAI module version is at least 0.7.0
+$minVersion = [version]"0.7.0"
 $scriptname = "AIPSTeam"
 if ( Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion $minVersion ) {
     # Import the PSAOAI module forcefully
@@ -3433,12 +3478,6 @@ if (-not $LoadProjectStatus) {
 
 # Disabe PSAOAI importing banner
 $env:PSAOAI_BANNER = "0"
-try {
-    [System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
-}
-catch {
-    Write-VerboseWrapper "Could not persist PSAOAI_BANNER to user environment; using process environment only."
-}
 
 Show-Banner
 
@@ -3475,6 +3514,9 @@ else {
 # Check if the UserInput parameter is not provided
 if (-not $UserInput) {
     if (-not $LoadProjectStatus) {
+        if ($NOInteraction) {
+            throw 'UserInput is required when NOInteraction is set unless TheCodePath supplies code or LoadProjectStatus is provided.'
+        }
         # Prompt the user to enter the PowerShell project description
         while (-not $UserInput) {
             Write-Host ">> Please enter the PowerShell project description" -ForegroundColor DarkBlue
@@ -4261,7 +4303,7 @@ $RAGpromptAddon
     Save-AndUpdateCode -response $powerShellDeveloperResponce -GlobalState $GlobalState
     #endregion PM-PSDev
 
-    if ($GlobalState.ReducedWorkflow) {
+    if ($GlobalState.ReducedWorkflow -or $GlobalState.DraftOutcome -eq 'Incomplete') {
         Write-Information "++ Reduced workflow enabled. Skipping Analyst, Architect, Domain Expert, QA, PSScriptAnalyzer, Documentator, and final Project Manager report stages." -InformationAction Continue
     }
     else {
@@ -4569,8 +4611,8 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 Show-Header -HeaderText "Save Project State"
                 if (-not (Test-Path $ProjectfilePath)) {
                     try {
-                        Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
-                        if (Test-Path -Path $ProjectfilePath) {
+                        $projectStateSaved = Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
+                        if ($projectStateSaved -ceq $true) {
                             Write-Information "++ Project state saved successfully to $ProjectfilePath" -InformationAction Continue
                         }
                         else {
@@ -4584,8 +4626,8 @@ while ($userOption -ne 'Q' -and -not $NOInteraction) {
                 else {
                     $userChoice = Read-Host -Prompt "File 'Project.xml' exists. Do you want to save now? (Y/N)"
                     if ($userChoice -eq 'Y' -or $userChoice -eq 'y') {
-                        Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
-                        if (Test-Path -Path $ProjectfilePath) {
+                        $projectStateSaved = Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
+                        if ($projectStateSaved -ceq $true) {
                             Write-Information "++ Project state saved successfully to $ProjectfilePath" -InformationAction Continue
                         }
                         else {
@@ -4699,7 +4741,13 @@ if (-not $GlobalState.NOLog) {
         if (Test-Path -Path $TheFinalCodeFullName) {
             # Call the function to check the code in 'TheCode.ps1' file
             Write-Information "++ The final code was exported to $TheFinalCodeFullName`n" -InformationAction Continue
-            $issues = Invoke-CodeWithPSScriptAnalyzer -FilePath $TheFinalCodeFullName
+            try {
+                $issues = Invoke-CodeWithPSScriptAnalyzer -FilePath $TheFinalCodeFullName
+                $GlobalState | Add-Member -MemberType NoteProperty -Name ValidationOutcome -Value $(if ($issues) { 'Findings' } else { 'Clean' }) -Force
+            } catch {
+                $GlobalState | Add-Member -MemberType NoteProperty -Name ValidationOutcome -Value 'Failed' -Force
+                Write-Information "-- Failed final validation: draft retained; analyzer did not complete. $_" -InformationAction Continue
+            }
             if ($issues) {
                 write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
             }
@@ -4714,18 +4762,30 @@ if (-not $GlobalState.NOLog) {
 else {
     #Export-AndWritePowerShellCodeBlocks -InputString $($powerShellDeveloper.GetLastMemory().Response) -StartDelimiter '```powershell' -EndDelimiter '```' -OutputFilePath $(join-path ([System.Environment]::GetEnvironmentVariable("TEMP", "user")) "TheCodeF.ps1")
     # Call the function to check the code in 'TheCode.ps1' file
-    $issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $GlobalState.lastPSDevCode
+    try {
+        $issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $GlobalState.lastPSDevCode
+        $GlobalState | Add-Member -MemberType NoteProperty -Name ValidationOutcome -Value $(if ($issues) { 'Findings' } else { 'Clean' }) -Force
+    } catch {
+        $GlobalState | Add-Member -MemberType NoteProperty -Name ValidationOutcome -Value 'Failed' -Force
+        Write-Information "-- Failed final validation: draft retained; analyzer did not complete. $_" -InformationAction Continue
+    }
     if ($issues) {
         write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
     }
 }
 #endregion Final code
-Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
-if ($ProjectfilePath) {
+$projectStateSaved = Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
+if ($projectStateSaved -ceq $true) {
     Write-Host "`n`n++ Your progress on Project has been saved!`n`n"
     Write-Host "++ You can resume working on this project at any time by loading the saved state. Just run:`nAIPSTeam.ps1 -LoadProjectStatus `"$ProjectfilePath`"`n`n"
 }
 
+if ($GlobalState.DraftOutcome -eq 'Incomplete') {
+    throw 'Incomplete draft: no new nonempty parseable PowerShell draft; prior code and diagnostic state retained when saving succeeded.'
+}
+if ($GlobalState.ValidationOutcome -eq 'Failed') {
+    throw 'Failed final validation: analyzer did not complete; draft and recovery state retained when saving succeeded.'
+}
 Write-Host "Exiting...`n"
 
 # Ensure to reset the culture back to the original after the script execution

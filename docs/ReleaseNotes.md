@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.10.4] - UNPUBLISHED candidate
+
+This is the 3.10.4 stabilization release candidate, not a published release. Script metadata, help and runtime version are 3.10.4. PSAOAI >= 0.7.0 is now required both at startup and by #Requires; older installations are intentionally excluded. External dependency names remain in supported PSScriptInfo metadata; the versioned requirement is declared through #Requires, not invented metadata syntax.
+
+- Add UTF-8 BOM for native Windows PowerShell 5.1 parsing compatibility.
+- Remove unsupported diagnostic JSON parsing options on Windows PowerShell 5.1.
+- Reject whitespace-only Developer responses at the terminal response guard.
+- Normalize legacy project states missing `LLMProvider` or `ReducedWorkflow` to `AzureOpenAI` or `$false` while preserving existing fields.
+- Return an explicit save result and check it in both menu callers and final save before reporting success. This does not provide atomic saves or a data-loss protection guarantee.
+- Clarify that `ReducedWorkflow` skips intermediate review/analysis/documentation/report stages but retains final PSScriptAnalyzer analysis; PSAOAI, PSScriptAnalyzer and PowerHTML remain globally mandatory.
+- Extend provider-free native function/section contracts to cover save callers. Parser and contract checks do not qualify full startup, all providers, RAG, streaming, generated scripts or fresh full analyzer results. Beta output remains a draft requiring human review.
+
+- Add optional AzureReasoningModel, AzureEndpoint and AzureAPIVersion caller overrides, forwarded equally to primary and existing fallback calls without changing omitted-option resolution or fallback policy.
+- Remove User banner persistence; retain process suppression. Offline synthetic configuration/body tests are not live dated Azure API qualification or missing-config fail-closed guarantees.
+- Reject missing NOInteraction input before prompting unless supplied by code/state. Track Complete/Incomplete draft and Clean/Findings/Failed validation outcomes, retain prior code on incomplete extraction, and fail terminally on incomplete draft or analyzer failure after attempted recovery save.
+- Wire all four offline suites (37 core, 8 startup, 7 draft/validation, 13 legacy Azure) on native Windows 5.1 and 7 with required reports and always-upload receipts. PSAOAI source is separately checked out at an immutable commit and hash-guarded without module bootstrap or fixture vendoring; remote CI remains pending delivery.
+- Historical native PowerShell 7 live canonical acceptance used two calls and real final analysis on earlier implementation bytes, not this final metadata/help candidate. Windows 5.1 is offline-qualified only. Culture/process banner and temporary-module lifecycle residues remain; private raw diagnostics may echo provider content. Beta, provider/RAG/streaming/full-workflow and generated-code limits remain.
+
 ## [3.10.3] - 2026.03.26
 
 - improve WSL/Linux and Azure OpenAI compatibility, including safer environment-variable resolution and cross-platform log path handling.
