@@ -2283,10 +2283,11 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
     $response = ""
 
     # Define headers for the HTTP request
-    $headers = @{
-        "Content-Type"  = "application/json"
-        "Authorization" = "Bearer $ApiKey"
+    $headers = @{ "Content-Type" = "application/json" }
+    if (-not [string]::IsNullOrWhiteSpace($ApiKey) -and $ApiKey -ne '***') {
+        $headers.Authorization = "Bearer $ApiKey"
     }
+    $endpoint = $endpoint.TrimEnd('/') + '/'
 
     # Construct the JSON body for the request
     $bodyJSON = [ordered]@{
@@ -2327,7 +2328,9 @@ function Invoke-AIPSTeamLMStudioChatCompletion {
         $httpClient = [System.Net.Http.HttpClient]::new($httpClientHandler)
             
         # Set the required headers
-        $httpClient.DefaultRequestHeaders.Add("api-key", $ApiKey)
+        if ($headers.Authorization) {
+            $httpClient.DefaultRequestHeaders.Add("Authorization", $headers.Authorization)
+        }
             
         # Set the timeout for the HttpClient
         $httpClient.Timeout = New-TimeSpan -Seconds $timeoutSec
@@ -3575,78 +3578,40 @@ if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
 #endregion ollama
 
 #region LMStudio
-# Check if the LLM provider is 'lmstudio'
+# LM Studio and authenticated llama.cpp share the OpenAI-compatible adapter.
 if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
-    # Retrieve the LM Studio API key from the environment variables
+    $script:LMStudioModel = $null
     $script:lmstudioApiKey = Get-EnvValue -Name 'OPENAI_API_KEY'
-    # Retrieve the LM Studio API base URL from the environment variables
     $script:lmstudioApiBase = Get-EnvValue -Name 'OPENAI_API_BASE'
-    $env:OPENAI_API_KEY = $script:lmstudioApiKey
+    if ([string]::IsNullOrWhiteSpace($script:lmstudioApiBase)) {
+        $script:lmstudioApiBase = 'http://localhost:1234/v1/'
+    }
+    $script:lmstudioApiBase = $script:lmstudioApiBase.TrimEnd('/') + '/'
+    # Only update this process; never persist a key or defaults in User settings.
     $env:OPENAI_API_BASE = $script:lmstudioApiBase
-    # If the API key is not set, use the default value 'lm-studio' and set it in the environment variables
-    if (-not $script:lmstudioApiKey) {
-        $script:lmstudioApiKey = 'lm-studio'
-        $env:OPENAI_API_KEY = $script:lmstudioApiKey
-        [System.Environment]::SetEnvironmentVariable('OPENAI_API_KEY', $script:lmstudioApiKey, 'user')
-        Write-VerboseWrapper "++ Default LM Studio API key set to 'lm-studio'"
+    $headers = @{}
+    if (-not [string]::IsNullOrWhiteSpace($script:lmstudioApiKey) -and $script:lmstudioApiKey -ne '***') {
+        $headers.Authorization = "Bearer $script:lmstudioApiKey"
     }
-
-    # If the API base URL is not set, use the default value 'http://localhost:1234/v1' and set it in the environment variables
-    if (-not $script:lmstudioApiBase) {
-        $script:lmstudioApiBase = 'http://localhost:1234/v1'
-        $env:OPENAI_API_BASE = $script:lmstudioApiBase
-        [System.Environment]::SetEnvironmentVariable('OPENAI_API_BASE', $script:lmstudioApiBase, 'user')
-        Write-VerboseWrapper "++ Default LM Studio API base set to 'http://localhost:1234/v1'"
-    }
-
-    # Ensure the LMStudio endpoint ends with a '/'
-    if (-not $script:lmstudioApiBase.EndsWith('/')) {
-        $script:lmstudioApiBase += '/'
-    }
-
     try {
-        $LMStudioServerResponse = Invoke-WebRequest -Uri $script:lmstudioApiBase
-        if ($LMStudioServerResponse.statuscode -eq "200") {
-            Write-Host "++ LM Studio server is running." -ForegroundColor Green
-        }
-        else {
-            Write-Host "-- LM Studio server not running." -ForegroundColor Yellow
+        # /v1/ need not expose a root route: authenticated model discovery is readiness.
+        $LMStudioModelResponse = Invoke-RestMethod -Uri "$($script:lmstudioApiBase)models" -Headers $headers -Method GET -ErrorAction Stop
+        $models = @($LMStudioModelResponse.data)
+        if ($models.Count -eq 0 -or $models[0].id -isnot [string] -or [string]::IsNullOrWhiteSpace($models[0].id)) {
+            Write-Warning '-- LM Studio model discovery returned no valid first model. Load a model and check server configuration.'
             return
         }
-    }
-    catch [System.Net.WebException] {
-        Write-Warning "LM Studio server is not running or not reachable. Please ensure the server is up and running at $($script:lmstudioApiBase)."
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "LM Studio server is not running or not reachable"
-        Throw $_
+        $script:LMStudioModel = $models[0].id
+        if ($models.Count -gt 1) {
+            Write-Host '++ LM Studio is running in Multi Model Session. Choosing the first model.'
+        }
+        Write-Host '++ LM Studio server is running.' -ForegroundColor Green
     }
     catch {
-        Update-ErrorHandling -ErrorContext "LM Studio server is not running or not reachable"-ErrorRecord $_
+        # Do not log raw transport errors (which may include headers or credentials).
+        Write-Warning '-- LM Studio model discovery failed. Check server availability and authentication.'
+        return
     }
-    # Test lm-studio for model
-    try {
-        $LMStudioModelResponse = Invoke-RestMethod -Uri "$($script:lmstudioApiBase)models" -Method GET
-        if ($LMStudioModelResponse.data.Count -eq 0) {
-            Write-Host "-- No models loaded. Please load a model in LM Studio first."
-            return
-        }
-        elseif ($LMStudioModelResponse.data.Count -gt 1) {
-            Write-Host "++ LM Studio is running in Multi Model Session. Only one model can be chosen. Choosing the first one."
-        }
-        if ($LMStudioModelResponse.data[0].id) {
-            $script:LMStudioModel = $LMStudioModelResponse.data[0].id
-        }
-    }
-    catch [System.Net.WebException] {
-        #System.InvalidOperationException
-        Write-Warning "LM Studio server is not running or not reachable. Please ensure the server is up and running at $($script:lmstudioApiBase)."
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "LM Studio server is not running or not reachable"
-        Throw $_
-    }
-    catch {
-        Update-ErrorHandling -ErrorContext "LM Studio server is not running or not reachable" -ErrorRecord $_
-        #Throw $_.Exception.Message
-    }
-
 }
 #endregion LMStudio
 
