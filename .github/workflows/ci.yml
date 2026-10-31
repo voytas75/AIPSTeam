@@ -25,7 +25,7 @@ jobs:
           path: .ci/PSAOAI
           persist-credentials: false
       - name: Allocate unique evidence root
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         run: |
           $psaoai = Join-Path $env:RUNNER_TEMP ('psaoai-' + [guid]::NewGuid().ToString('N'))
           Move-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE '.ci/PSAOAI') -Destination $psaoai
@@ -33,14 +33,16 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP ('aipsteam-' + [guid]::NewGuid().ToString('N'))
           "AIPSTEAM_EVIDENCE=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Required files, whole-source parsing and provider-free contracts
-        shell: ${{ matrix.shell }}
+        shell: pwsh
+        env:
+          AIPSTEAM_RUNTIME: ${{ matrix.shell }}
         run: |
-          $exe = (Get-Process -Id $PID).Path
+          $exe = (Get-Command ($env:AIPSTEAM_RUNTIME + '.exe') -CommandType Application -ErrorAction Stop).Source
           & $exe -NoProfile -NonInteractive -File ./tools/tests/Invoke-ReleaseCI.ps1 -RepositoryRoot $env:GITHUB_WORKSPACE -EvidenceRoot $env:AIPSTEAM_EVIDENCE -PSAOAIPath $env:PSAOAI_SOURCE
           if ($LASTEXITCODE -ne 0) { throw "Local CI checks failed: $LASTEXITCODE" }
       - name: Require evidence reports
         if: always()
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         run: |
           foreach ($report in @('psaoai-pin.json', 'whole-source-parser.json', 'parser.json', 'runner-results.json', 'contracts/results.json', 'contracts.log', 'startup/summary.json', 'startup.log', 'draft/summary.json', 'draft.log', 'legacy/summary.json', 'legacy.log')) {
             if (-not $env:AIPSTEAM_EVIDENCE -or -not (Test-Path -LiteralPath (Join-Path $env:AIPSTEAM_EVIDENCE $report))) {
