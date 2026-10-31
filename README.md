@@ -1,455 +1,65 @@
-# AI PowerShell Team with RAG
+# AI PowerShell Team (AIPSTeam)
 
-[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
-[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/AIPSTeam)](https://www.powershellgallery.com/packages/AIPSTeam)
-[![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/AIPSTeam)](https://www.powershellgallery.com/packages/AIPSTeam)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/86de45135d5e4b3da515e5c7d56bc365)](https://app.codacy.com/gh/voytas75/AIPSTeam/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#known-limitations)
+AIPSTeam helps PowerShell builders and automation engineers turn a project description or existing script into a draft. It simulates a team that can propose requirements, code, documentation and review feedback using Azure OpenAI, Ollama or LM Studio.
 
-![AIPSTeam](https://github.com/voytas75/AIPSTeam/blob/master/images/AIPSTeam.png?raw=true "aipsteam")
+**Beta:** generated code requires human review and testing. AIPSTeam does not execute the generated script. Model quality and context size affect the result. Prompts, script contents and retrieved context may be sent to your selected providers; do not include secrets or sensitive data without authorization.
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/A0A6KYBUS)
+## Requirements
 
-AIPSTeam is a PowerShell-first AI collaboration script that simulates a small delivery team around your project idea or existing script. Instead of giving you one raw answer, it helps produce a more structured first draft: requirements framing, implementation guidance, PowerShell output, documentation, and review-style feedback. It works with Azure OpenAI, Ollama, or LM Studio and is best approached through one clear first-run path before exploring the wider feature set.
+- Windows PowerShell 5.1 or PowerShell 7; Windows is the recommended starting environment.
+- `PSAOAI` >= 0.7.0, `PSScriptAnalyzer` and `PowerHTML`. All three modules are required, even when RAG or the full workflow is disabled.
+- One working LLM backend. Configure it before running AIPSTeam; see [provider setup](docs/provider-configuration.md).
 
-## Table of Contents
-
-- [Who this is for](#who-this-is-for)
-- [Why use AIPSTeam](#why-use-aipsteam)
-- [5-minute quickstart](#5-minute-quickstart)
-- [What you get](#what-you-get)
-- [Example first-run output](#example-first-run-output)
-- [Representative example artifact](#representative-example-artifact)
-- [Recommended parameters](#recommended-parameters)
-- [Supported environment](#supported-environment)
-- [Known limitations](#known-limitations)
-- [Advanced parameters](#advanced-parameters)
-- [Overview](#overview)
-- [Retrieval-Augmented Generation (RAG)](#retrieval-augmented-generation-rag)
-- [Installation notes](#installation-notes)
-- [Additional usage examples](#additional-usage-examples)
-- [Developer notes](#developer-notes)
-- [Dependencies and prerequisites](#dependencies-and-prerequisites)
-- [Troubleshooting](#troubleshooting)
-- [FAQ](#faq)
-
-## Who this is for
-
-AIPSTeam is for:
-- PowerShell builders who want more than a single one-shot prompt
-- sysadmins and automation engineers who want AI-assisted project drafting
-- people who want code, documentation, and review-style output in one workflow
-
-AIPSTeam is **not** the best fit for:
-- tiny one-line scripts
-- users who do not have any LLM backend configured
-- cases where fully production-ready output is expected from the first run without review
-
-## Why use AIPSTeam
-
-- **Multi-role workflow**: instead of one generic answer, the script simulates a team of specialists
-- **PowerShell-first output**: focused on PowerShell project work rather than generic coding chatter
-- **Documentation and review included**: useful when you want a first structured draft, not just raw code
-- **Flexible backend choice**: Azure OpenAI, Ollama, or LM Studio
-- **Better first-pass thinking**: useful when you want something closer to a draft delivery workflow than a single prompt completion
-
-## 5-minute quickstart
-
-### 1) Install required modules
+## Install
 
 ```powershell
-Install-Module -Name PSAOAI
-Install-Module -Name PSScriptAnalyzer
-Install-Module -Name powerHTML
+Install-Module -Name PSAOAI -MinimumVersion 0.7.0 -Scope CurrentUser
+Install-Module -Name PSScriptAnalyzer -Scope CurrentUser
+Install-Module -Name PowerHTML -Scope CurrentUser
+Install-Script -Name AIPSTeam -Scope CurrentUser
 ```
 
-### 2) Install the script
+The Gallery release is currently **3.10.3**; this checkout contains the **3.10.4 candidate, not yet published**. `Install-Script` installs the published release, not this candidate. To use the candidate, download or clone this checkout and run `./AIPSTeam.ps1` from its directory after installing the modules above.
+
+If the installed script is not on `PATH`, locate it with `Get-InstalledScript -Name AIPSTeam` and run the file from its `InstalledLocation`.
+
+## First run: a small code draft
+
+Configure Azure credentials securely through [PSAOAI](https://github.com/voytas75/PSAOAI). Replace the deployment, endpoint and dated API version below with values supported by your Azure deployment. Do not put an API key in the command.
+
+Run this from the checkout directory (for the published script, use its installed path instead):
 
 ```powershell
-Install-Script AIPSTeam
+$prompt = "Create a PowerShell tool that checks local administrator membership and exports results to CSV."
+$prompt | ./AIPSTeam.ps1 -LLMProvider AzureOpenAI `
+    -DeploymentChat 'your-deployment-name' `
+    -AzureEndpoint 'https://your-resource.openai.azure.com' `
+    -AzureAPIVersion 'YYYY-MM-DD' `
+    -MaxTokens 2048 -NORAG -ReducedWorkflow -NOInteraction -Stream $false
 ```
 
-### 3) Configure one LLM backend
+This candidate example uses explicit Azure options introduced in 3.10.4. For Gallery 3.10.3, configure the endpoint/API version through PSAOAI and omit `-AzureEndpoint` and `-AzureAPIVersion`.
 
-For the smoothest first run, use the backend you already have working.
+`-ReducedWorkflow` runs Manager → Developer and final PSScriptAnalyzer analysis; it skips intermediate reviews, documentation and reports. Remove it when you want the fuller team workflow. `-NORAG` disables web retrieval, not model calls. Add `-AzureReasoningModel` only if your Azure model needs PSAOAI reasoning-mode handling.
 
-Supported providers:
-- [Azure OpenAI](https://azure.microsoft.com/en-us/services/cognitive-services/openai-service/)
-- [LM Studio](https://lmstudio.ai/)
-- [Ollama](https://ollama.com/)
+`-NOInteraction` disables AIPSTeam questions and menus, but missing provider configuration can still trigger dependency setup prompts. Configure and test the backend first. For Ollama or LM Studio, use the [backend-specific setup](docs/provider-configuration.md), not just a different provider name.
 
-PSAOAI module repo:
-- [PSAOAI](https://github.com/voytas75/PSAOAI)
+## Results and recovery
 
-> [!IMPORTANT]
-> You need Azure OpenAI, Ollama, or LM Studio to use this script.
+Look for console messages and a timestamped run directory containing generated `TheCode_v*.ps1` files and logs. The default root is `MyDocuments/AIPSTeam` (home/current-directory fallback); choose your own with `-LogFolder`.
 
-### 4) Run the recommended first demo
+- `DraftOutcome=Complete` means nonempty, parseable code was extracted, not that it is correct. `Incomplete` retains prior code/version and ends unsuccessfully.
+- `ValidationOutcome=Clean`, `Findings` or `Failed` reports final static analysis. Findings require review; failure retains the draft and ends unsuccessfully. A clean result does not prove runtime safety.
+- Resume a saved `Project.xml` using `-LoadProjectStatus`. Saves are not atomic: keep independent backups. See [usage and recovery](docs/usage.md).
 
-This is the canonical first-run path for understanding what AIPSTeam does.
-It keeps the workflow non-interactive and disables RAG so you do not need search-provider setup for the first pass.
+Review the generated script, permissions and assumptions before testing it in a safe environment. Logs can contain prompts and provider responses; redact them before sharing.
 
-```powershell
-$prompt = @"
-Create a PowerShell tool that checks local administrator membership,
-exports results to CSV, and generates basic documentation.
-"@
+## Documentation
 
-$prompt | AIPSTeam.ps1 -LLMProvider "AzureOpenAI" -NOInteraction -NORAG -Stream $false
-```
-
-If you want the most completion-friendly path on heavier models, use the reduced workflow mode:
-
-```powershell
-$prompt | AIPSTeam.ps1 -LLMProvider "AzureOpenAI" -NOInteraction -NORAG -ReducedWorkflow -Stream $false
-```
-
-If you are using another backend, switch only the provider value:
-- `-LLMProvider "ollama"`
-- `-LLMProvider "LMStudio"`
-
-## What you get
-
-After a successful first run, you should expect output such as:
-- a clarified project goal or requirements summary
-- implementation ideas or proposed PowerShell structure
-- generated PowerShell code or code fragments
-- documentation draft content
-- review-style or QA-style feedback
-
-The exact result depends on the model quality, available context window, and the prompt you provide.
-
-> [!IMPORTANT]
-> The quality of the generated project depends significantly on the model used and the context window available. Better models and better context generally produce better drafts.
-
-## Example first-run output
-
-A realistic first run will not usually give you a polished production-ready module. What it should give you is a strong working draft, for example:
-
-```text
-Requirements summary
-- Check local administrator membership
-- Export results to CSV
-- Produce basic usage documentation
-
-Proposed implementation
-- Collect local group membership
-- Normalize account names and types
-- Export results with timestamp
-- Add basic error handling and documentation
-
-Draft deliverables
-- PowerShell code skeleton
-- suggested function layout
-- documentation outline
-- reviewer notes / next improvements
-```
-
-That is the value of AIPSTeam: a more structured project draft than a single one-shot reply.
-
-## Representative example artifact
-
-For a fuller walkthrough, see:
-- [`docs/first-run-example.md`](docs/first-run-example.md)
-
-That file shows a representative first-run scenario, the command used, the shape of the output, and what still needs human review.
-
-## Recommended parameters
-
-These are the most useful parameters for a realistic first run:
-
-- `userInput` — project outline as a string; can also be piped
-- `-NOInteraction` — run without prompts or menus during the session
-- `-ReducedWorkflow` — run the initial Manager + Developer pass, skipping intermediate reviews, analysis, documentation and reports while retaining final PSScriptAnalyzer analysis
-- `-LLMProvider` — choose the backend: `AzureOpenAI`, `ollama`, or `LMStudio`
-- `-NORAG` — disable retrieval for a simpler first run
-- `-Stream $false` — disable streaming for a cleaner, easier-to-review result
-- `-TheCodePath` — work directly on an existing PowerShell script
-
-## Supported environment
-
-**Best-supported path**
-- Windows PowerShell / PowerShell-focused workflow
-- one configured LLM backend only for the first run
-- non-interactive first pass with `-NOInteraction -NORAG -Stream $false`
-
-**Supported providers**
-- Azure OpenAI
-- Ollama
-- LM Studio
-
-**Practical guidance**
-- Start with the provider you already have working.
-- Start without RAG for the first run.
-- Treat Windows as the safest default path for now.
-- If you are on WSL/Linux or a mixed environment, expect more setup friction and verify the PSAOAI/runtime path first.
-
-## Known limitations
-
-- First-run output is a **working draft**, not a production-ready deliverable.
-- Result quality depends heavily on the selected model and available context window.
-- The smoothest path is to configure exactly one backend first and leave RAG off until the base flow works.
-- PSAOAI/runtime environment issues can be the main source of friction, especially outside the most typical Windows-oriented setup.
-- Advanced parameters are useful, but they are not the right starting point for understanding the tool.
-- Native parser and provider-free function/section regression checks do not qualify full startup, all providers, RAG, streaming or generated scripts. No fresh full analyzer qualification is implied.
-- Project-state save callers check the boolean save result before reporting success. Legacy states missing `LLMProvider` or `ReducedWorkflow` are normalized to `AzureOpenAI` or `$false`, retaining existing fields. These saves are not atomic and provide no data-loss protection guarantee; keep independent backups.
-
-## Advanced parameters
-
-Use these after the basic flow is already clear:
-
-- `-Stream` — enable or disable live streaming (`$true` by default)
-- `-NOPM` — disable Project Manager functions
-- `-ReducedWorkflow` — skip intermediate multi-review, analysis, documentation and report stages after Manager → Developer; final PSScriptAnalyzer analysis still runs
-- `-NODocumentator` — disable Documentator functions
-- `-NOLog` — disable logging
-- `-LogFolder` — specify where logs should be stored
-- `-DeploymentChat` — override the Azure OpenAI deployment setting
-- `-MaxTokens` — control the length of generated responses
-- `-NOTips` — disable tips
-- `-VerbosePrompt` — show prompts
-- `-LoadProjectStatus` — resume from a saved project state
-- `-NOUserInputCheck` — disable the input check step
-
-## Overview
-
-This PowerShell script simulates a team of AI agents working together on a PowerShell project. Each specialist has a role and contributes to the project in sequence. The script processes user input, performs different project tasks, and can generate outputs such as code, documentation, and analysis reports.
-
-The main value of AIPSTeam is not just “generate some code,” but to move through a more structured multi-role flow that resembles requirements thinking, implementation, review, and documentation.
-
-## Retrieval-Augmented Generation (RAG)
-
-RAG combines retrieval and generation to produce more accurate and contextually relevant outputs.
-
-How it works:
-1. **Retrieval**: the system fetches relevant external information.
-2. **Generation**: the LLM uses that information to produce better output.
-
-By integrating these two phases, AIPSTeam can produce more informed responses than a prompt-only flow.
-
-### Data source for RAG
-
-AIPSTeam uses web search providers as a source for retrieval.
-Supported services include:
-- [SerpApi](https://serpapi.com/) — 100 free searches per month
-- [EXA](https://exa.ai/) — 1000 free searches per month
-- [Serper](https://serper.com/) — 1000 free searches per month
-- ~~[Bing Web Search API](https://www.microsoft.com/en-us/bing/apis/bing-web-search-api)~~ — retired ([retirement notice](https://azure.microsoft.com/en-us/updates?id=483570))
-
-Current behavior:
-1. the script tries SerpApi first
-2. if that fails, it tries EXA
-3. if that fails, it tries Serper
-4. if all fail, the script continues without successful retrieval
-
-For a simpler first experience, use `-NORAG` and come back to RAG later.
-
-## Installation notes
-
-### Environment variables
-
-To configure external providers, set the needed environment variables before running the script.
-
-### Azure OpenAI
-
-- `PSAOAI_API_AZURE_OPENAI_KEY`
-- `PSAOAI_API_AZURE_OPENAI_ENDPOINT`
-- `PSAOAI_API_AZURE_OPENAI_APIVERSION`
-- `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`
-- `PSAOAI_BANNER`
-
-Example:
-
-```powershell
-[Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_ENDPOINT','https://<your-endpoint>.openai.azure.com','user')
-[Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_APIVERSION','2024-05-01-preview','user')
-[Environment]::SetEnvironmentVariable('PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT','your-deployment-name','user')
-```
-
-> [!IMPORTANT]
-> The `PSAOAI_API_AZURE_OPENAI_KEY` environment variable cannot be provided manually because the PSAOAI module encrypts it for security purposes. Ensure that the key is set and managed through PSAOAI's secure mechanisms.
-
-### Ollama
-
-- `OLLAMA_ENDPOINT`
-- `OLLAMA_MODEL`
-
-The script sets `OLLAMA_ENDPOINT` to `http://localhost:11434/` by default.
-
-Example:
-
-```powershell
-[Environment]::SetEnvironmentVariable('OLLAMA_MODEL','ollama model, example: phi3:latest','user')
-```
-
-> [!IMPORTANT]
-> For the **Ollama** provider, you do not need to manually define the `OLLAMA_MODEL` environment variable before the first run. The script can check the status of Ollama and guide model selection interactively when needed.
-
-### LM Studio
-
-- `OPENAI_API_KEY`
-- `OPENAI_API_BASE`
-
-Example:
-
-```powershell
-[Environment]::SetEnvironmentVariable('OPENAI_API_KEY','lm-studio','user')
-[Environment]::SetEnvironmentVariable('OPENAI_API_BASE','http://localhost:1234/v1','user')
-```
-
-### RAG configuration
-
-- `SERPAPI_API_KEY`
-- `EXA_API_KEY`
-- `SERPER_API_KEY`
-- ~~`AZURE_BING_API_KEY`~~
-- ~~`AZURE_BING_ENDPOINT`~~
-
-Example:
-
-```powershell
-[Environment]::SetEnvironmentVariable('SERPAPI_API_KEY','your-serpapi-api-key','user')
-```
-
-## Additional usage examples
-
-If you are new to the project, treat the examples below as **after-first-run** patterns. The recommended demo above remains the canonical starting point.
-
-- **Basic usage**
-
-  ```powershell
-  "Monitor RAM usage and show a single color block based on the load." | AIPSTeam.ps1
-  ```
-
-  or
-
-  ```powershell
-  AIPSTeam -userInput "Monitor RAM usage and show a single color block based on the load."
-  ```
-
-- **Disable live streaming**
-
-  ```powershell
-  "Monitor RAM usage" | AIPSTeam.ps1 -Stream $false
-  ```
-
-- **Work on an existing script**
-
-  ```powershell
-  AIPSTeam.ps1 -TheCodePath "C:\UserScripts\script.ps1"
-  ```
-
-  This mode is useful when you want the AI team to improve, debug, or extend an existing PowerShell script instead of starting from a plain-language description.
-
-- **Run without interaction**
-
-  ```powershell
-  "Generate a daily system health report." | AIPSTeam.ps1 -NOInteraction
-  ```
-
-- **Use Ollama**
-
-  ```powershell
-  "Recent software activities on Windows 11." | AIPSTeam -LLMProvider "ollama" -Stream $false
-  ```
-
-- **Load a saved project status**
-
-  ```powershell
-  AIPSTeam.ps1 -LoadProjectStatus "path\to\your\Project.xml"
-  ```
-
-## Developer Notes
-
-### Code Structure
-
-- **Main Script**: `AIPSTeam.ps1`
-- **Classes**: `ProjectTeam`
-- **Functions**: various utility functions for processing input, logging, and analysis
-
-### Key Functions and Logic
-
-- **ProjectTeam Class**: represents a team member with specific expertise
-  - `ProcessInput`
-  - `Feedback`
-  - `AddLogEntry`
-  - `Notify`
-  - `SummarizeMemory`
-- **Utility Functions**:
-  - `SendFeedbackRequest`
-  - `Invoke-CodeWithPSScriptAnalyzer`
-  - `Export-AndWritePowerShellCodeBlocks`
-
-## Dependencies and Prerequisites
-
-- **PowerShell Version**: PowerShell 5.1 or later
-- **Modules**:
-  - `PSAOAI`
-  - `PSScriptAnalyzer`
-  - `powerHTML`
-
-All three modules are globally mandatory through script `#Requires`, even with `-NORAG` or `-ReducedWorkflow` and regardless of the selected provider.
-
-## Troubleshooting
-
-- **Module not found**: install the required modules with `Install-Module`
-- **Permission issues**: run PowerShell as Administrator if your environment requires it
-- **Script errors**: check the generated log files for details
-- **Provider setup confusion**: start with one backend only and use `-NORAG` for the first pass
-- **Too much output noise**: use `-NOInteraction -Stream $false` for a calmer first run
-- **WSL/Linux friction**: if the runtime path behaves oddly outside the most typical Windows setup, verify PSAOAI and backend configuration before assuming the script logic is broken
-
-## FAQ
-
-### How do I install the required modules?
-
-```powershell
-Install-Module -Name PSAOAI
-Install-Module -Name PSScriptAnalyzer
-Install-Module -Name powerHTML
-```
-
-### How do I disable live streaming?
-
-```powershell
-AIPSTeam.ps1 -Stream $false
-```
-
-### Where are the log files stored?
-
-Log files are stored in the specified log folder or in the default folder under `MyDocuments`.
-
-### How do I load a saved project status?
-
-```powershell
-AIPSTeam.ps1 -LoadProjectStatus "path\to\your\Project.xml"
-```
-
-### How do I disable the Project Manager functions?
-
-```powershell
-AIPSTeam.ps1 -NOPM
-```
-
-### How do I specify a custom LLM model for Ollama?
-
-```powershell
-$env:OLLAMA_MODEL = "your_custom_model"
-AIPSTeam.ps1 -LLMProvider "ollama"
-```
-
-For deeper setup and first-run guidance, prefer the sections above before treating this FAQ as the main entry point.
-
-## 3.10.4 release candidate — not published
-
-PSAOAI >= 0.7.0 is mandatory; the runtime check and versioned `#Requires` agree. Windows PowerShell 5.1 and native PowerShell 7 are covered by offline parser, core (37 cases), startup (8), draft/validation (7) and legacy Azure (13) suites. CI uses immutable external PSAOAI source with commit and normalized-file hash guards, without installing or bootstrapping provider modules; remote CI is pending separately approved delivery.
-
-`NOInteraction` rejects missing input before prompting unless code or saved state supplies it. Nonempty parseable extraction marks `DraftOutcome=Complete`; absent/empty/unparseable code marks `Incomplete`, retains prior code/version and ends unsuccessfully. Final analysis records `ValidationOutcome=Clean`, `Findings` or `Failed`; failure retains the draft and ends unsuccessfully, while findings are not a clean-analysis guarantee. Saves check success but are non-atomic.
-
-A historical native PowerShell 7 canonical live run used real modules and two provider calls with clean final analysis. It binds to the earlier implementation bytes, not this metadata/help-updated candidate; no new live run is implied. Windows 5.1 acceptance is offline only. Beta drafts still require human review; all providers, RAG, streaming, full multi-review workflows and generated-code execution are not qualified. Culture/process banner residues and temporary dynamic-module lifecycle are not redesigned. Raw diagnostics can echo provider content and remain private; masking is not comprehensive sanitization.
-
-### Explicit Azure legacy options
-
-`-AzureReasoningModel`, `-AzureEndpoint` and `-AzureAPIVersion` optionally forward PSAOAI reasoning mode, endpoint and dated API version to both primary and existing Developer fallback calls. Omitted options preserve PSAOAI defaults/environment resolution; deployment-name inference and the gpt-5-only fallback policy are unchanged. Explicit reasoning uses the PSAOAI reasoning body, including its medium reasoning effort.
-
-Banner suppression is process-only, not persisted to User configuration. Complete synthetic Process configuration is covered offline with the original active PSAOAI resolvers; missing configuration can still prompt/persist in PSAOAI, so `NOInteraction` is not a fail-closed dependency configuration guarantee. Native offline tests do not verify the live dated Azure route or full provider compatibility.
+- [Provider configuration](docs/provider-configuration.md): Azure, Ollama and LM Studio setup.
+- [Usage and parameters](docs/usage.md): existing scripts, full workflow, logs and saved projects.
+- [RAG setup](docs/rag.md): optional web search and data handling.
+- [Troubleshooting](docs/troubleshooting.md): installation, provider and output issues.
+- [Representative first-run example](docs/first-run-example.md): curated full-workflow output, not a captured run.
+- [Developer and release guide](docs/developer-guide.md): implementation map and qualification limits.
+- [Release notes](docs/ReleaseNotes.md) · [License](LICENSE)

@@ -34,11 +34,9 @@ exports results to CSV, and generates basic documentation.
 $prompt | AIPSTeam.ps1 -LLMProvider "AzureOpenAI" -NOInteraction -NORAG -Stream $false
 ```
 
-This command is a good first-run path because it:
-- keeps the session non-interactive
-- avoids RAG setup for the first pass
-- avoids noisy streaming output
-- focuses on one clear draft request
+Run this after installing the required modules and completing [provider configuration](provider-configuration.md). For a checkout, replace `AIPSTeam.ps1` with `./AIPSTeam.ps1`; for a Gallery installation, use the installed script path if it is not on `PATH`.
+
+This full-workflow example suppresses AIPSTeam questions and menus, disables RAG and streaming, and asks for one draft. Missing provider configuration can still trigger dependency prompts. Unlike the smaller [README first run](../README.md#first-run-a-small-code-draft), it does not use `-ReducedWorkflow`, so documentation and review stages are enabled.
 
 ## Representative output shape
 
