@@ -3677,6 +3677,17 @@ function Write-VerboseWrapper {
     }
     Write-Verbose -Message $verboseMessage
 }
+function Write-AIPSTeamActiveProvider {
+    # Use effective project state, not the CLI default on resume. Never print credentials.
+    $providerDisplay = $GlobalState.LLMProvider
+    if ($GlobalState.LLMProvider -eq 'AzureOpenAI') {
+        $providerDisplay += " (Azure API: $script:AzureAPIProtocol)"
+    }
+    Write-Information "++ Active LLM provider: $providerDisplay" -InformationAction Continue
+    if ($GlobalState.ReducedWorkflow) {
+        Write-Information "++ Reduced workflow enabled. Skipping Analyst, Architect, Domain Expert, QA, intermediate PSScriptAnalyzer, Documentator, and final Project Manager report stages. Final PSScriptAnalyzer analysis remains enabled." -InformationAction Continue
+    }
+}
 #endregion Functions
 
 #region Setting Up
@@ -3886,6 +3897,7 @@ if ($LoadProjectStatus) {
         # Load the project state from the specified file
         $GlobalState = Get-ProjectState -FilePath $LoadProjectStatus
         Write-Information "++ Project state loaded successfully from $LoadProjectStatus" -InformationAction Continue
+        Write-AIPSTeamActiveProvider
         # Output verbose information about the loaded project state
         Write-VerboseWrapper "`$GlobalState.TeamDiscussionDataFolder: $($GlobalState.TeamDiscussionDataFolder)"
         Write-VerboseWrapper "`$GlobalState.FileVersion: $($GlobalState.FileVersion)"
@@ -3933,6 +3945,7 @@ if ($LoadProjectStatus) {
 }
 else {
     Try {
+        Write-AIPSTeamActiveProvider
         # Get the current date and time in the specified format
         $currentDateTime = Get-Date -Format "yyyyMMdd_HHmmss"
         if ([string]::IsNullOrWhiteSpace($GlobalState.LogFolder)) {
@@ -4546,7 +4559,6 @@ $RAGpromptAddon
     #endregion PM-PSDev
 
     if ($GlobalState.ReducedWorkflow -or $GlobalState.DraftOutcome -eq 'Incomplete') {
-        Write-Information "++ Reduced workflow enabled. Skipping Analyst, Architect, Domain Expert, QA, PSScriptAnalyzer, Documentator, and final Project Manager report stages." -InformationAction Continue
     }
     else {
         #region RA-PSDev
