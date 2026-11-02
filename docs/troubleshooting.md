@@ -10,7 +10,7 @@ Do not start with administrator privileges as a generic fix. Install with `-Scop
 
 ## Missing configuration or unexpected prompts
 
-Choose one backend and verify it first. Azure credentials are managed by PSAOAI; the endpoint, deployment and API version must match your deployment. Ollama needs a running service and available model; LM Studio needs a loaded model and running server.
+Choose one backend and verify it first. Azure uses Responses by default: configure the resource endpoint, deployment and key, without a dated API version. `-AzureAPIVersion` and `-AzureReasoningModel` apply only to explicit `-AzureAPIProtocol ChatCompletions`, whose credentials are managed by PSAOAI. Ollama needs a running service and available model; LM Studio needs a loaded model and running server.
 
 `-NOInteraction` suppresses AIPSTeam prompts and menus, not every dependency/provider setup prompt. Missing input is rejected before AIPSTeam asks for it unless an existing script or saved state supplies it. Use `-NORAG` to avoid first-run search configuration.
 
@@ -20,7 +20,7 @@ Check `DraftOutcome` and `ValidationOutcome`, the generated files and logs. Incr
 
 ## Too much output
 
-Use `-Stream $false` and, after configuration, `-NOInteraction`. `-ReducedWorkflow` skips intermediate stages; it is not a full documentation/review run. `-NOTips` hides tips. Avoid `-VerbosePrompt` when sharing console output.
+Use `-Stream $false` and, after configuration, `-NOInteraction`. `-ReducedWorkflow` skips intermediate stages; it is not a full documentation/review run. `-NOTips` hides tips. Avoid `-VerbosePrompt` when sharing console output. The startup notice identifies the effective provider and Azure protocol; reduced-workflow notices do not mean final static analysis is disabled.
 
 ## Logs and bug reports
 

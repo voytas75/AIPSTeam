@@ -30,7 +30,7 @@ Use an absolute path. This mode loads script contents for analysis, enhancement 
 | --- | --- |
 | `userInput` | Project outline; string or pipeline input. |
 | `TheCodePath` | Absolute path to an existing PowerShell script. |
-| `LLMProvider` | `AzureOpenAI` (default), `ollama`, `LMStudio`, or parser-accepted `OpenAI`; see provider guide. |
+| `LLMProvider` | `AzureOpenAI` (default), `ollama`, `LMStudio`, or `llama.cpp`. Parser-accepted `OpenAI` is unimplemented and throws; see provider guide. |
 | `Stream` | Boolean; `$true` by default. Use `-Stream $false` for non-streaming output. |
 | `NORAG` | Disable web retrieval, not LLM calls. |
 | `ReducedWorkflow` | Smaller Manager/Developer workflow; final static analysis remains. |
@@ -39,16 +39,16 @@ Use an absolute path. This mode loads script contents for analysis, enhancement 
 | `NODocumentator` | Disable Documentator functions. |
 | `NOLog` | Disable logging functions; do not treat this as comprehensive data sanitization. |
 | `LogFolder` | Custom log/output root. |
-| `DeploymentChat` | Azure deployment override; otherwise resolved from `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`. |
+| `DeploymentChat` | Azure deployment override; otherwise resolved from `PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT`. For `llama.cpp`, an exactly advertised model ID override; otherwise the first nonblank advertised ID is selected. |
 | `AzureAPIProtocol` | Azure-only: `Responses` (default v1 REST/SSE) or explicit `ChatCompletions` (PSAOAI legacy). Local providers unchanged. Not persisted in project state; repeat the compatibility selector on resume. |
 | `MaxTokens` | Response token limit; default `20480`. Responses uses `max_output_tokens`, covering visible and reasoning tokens. The first-run example uses `2048`; too small a limit can truncate code. |
 | `NOTips` | Disable tips. |
 | `VerbosePrompt` | Show prompts; may expose sensitive content. |
 | `LoadProjectStatus` | Load saved state; belongs to the `LoadStatus` parameter set. |
 | `NOUserInputCheck` | Disable input checking. |
-| `AzureReasoningModel` | explicit PSAOAI Azure reasoning mode. |
-| `AzureEndpoint` | optional Azure endpoint override. |
-| `AzureAPIVersion` | optional dated Azure API version override. |
+| `AzureReasoningModel` | ChatCompletions-only PSAOAI reasoning mode; ignored by Responses. |
+| `AzureEndpoint` | Azure endpoint override: resource/v1 Responses endpoint for Responses; PSAOAI endpoint for ChatCompletions. |
+| `AzureAPIVersion` | ChatCompletions-only dated API version override; ignored by Responses. |
 
 ## Output and saved projects
 
