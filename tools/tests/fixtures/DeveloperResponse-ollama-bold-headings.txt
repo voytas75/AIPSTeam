@@ -1,0 +1,24 @@
+1. **Script Purpose**
+   - The purpose of this script is to output the string "OK" using the `Write-Output` cmdlet. This basic script serves as a simple example to demonstrate the use of `Write-Output` in a PowerShell 5.1 environment.
+
+2. **PowerShell Code**
+   ```powershell
+   # SimpleOKScript.ps1
+   Write-Output 'OK'
+   ```
+
+3. **Usage Example**
+   - To run the script, open a PowerShell 5.1 or higher session and execute the following command:
+     ```powershell
+     .\SimpleOKScript.ps1
+     ```
+   - Alternatively, you can use the `Invoke-Expression` cmdlet to run the script:
+     ```powershell
+     Invoke-Expression -Command ".\SimpleOKScript.ps1"
+     ```
+
+4. **Notes**
+   - Ensure that the script file `SimpleOKScript.ps1` is saved in a directory that is included in your system's `PSModulePath` or is in the current directory.
+   - The script is designed to be minimal and straightforward, making it easy to understand and maintain.
+   - The `Write-Output` cmdlet is used to output the string "OK" to the console. This cmdlet is available in PowerShell 5.1 and higher, making it a reliable choice for this task.
+   - The script is self-contained and does not require any external dependencies or additional configuration.

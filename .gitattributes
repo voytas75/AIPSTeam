@@ -1,2 +1,3 @@
 # Preserve captured response bytes for the raw SHA256 fixture contract.
 tools/tests/fixtures/DeveloperResponse-b2fa536f.txt -text
+tools/tests/fixtures/DeveloperResponse-ollama-bold-headings.txt -text

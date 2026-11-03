@@ -1,8 +1,23 @@
 # AI PowerShell Team with RAG - release notes
 
+> **Unreleased next-version work:** this GitHub source includes offline-qualified backlog delivered to the repository, not a PowerShell Gallery release. Script version remains **3.10.4**; the next version is not selected. Current bytes are not freshly live-qualified.
+
 Changes in the current release source. [Archived release history](archive/release-history.md) preserves earlier entries.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
+
+## Unreleased — next stabilization release (version provisional)
+
+- Accept paired Markdown emphasis (`**`, `__`, `*`, `_`) around numbered PowerShell Code/Usage Example titles, case-insensitively, without changing prompts or section/fence admission. Native Windows 5.1/7 captured-response offline replay and 20-case export matrices pass; original-filepath reduced workflow with installed analyzer persists Complete/Clean. No fresh inference. Earlier live source binding is superseded by source SHA256 `E325D1EB5A373F0E00DA3DF25AD1C926CF688549FF2ADFE92F4A752FB2B481C5`; the historical live failure remains a failure. Incomplete-state recovery retains its original exception/outcome, not retroactive completion.
+
+- Append optional validated public Ollama `TimeoutSec`, conditionally inherited only when dispatcher timeout is omitted. Preserve omitted defaults, positional API, other providers and model persistence. Native 5.1/7 original-filepath RED rejects explicit timeout before repair; GREEN explicit 512-token/120-second and omitted-timeout controls all pass. Final source SHA256 `A3E385EB9E3E6A38580490428E9081525AB1CCCCB35D2D25FF32CA0521ACC1CE`.
+- Guarded unchanged installed PSAOAI/PowerHTML/PSScriptAnalyzer imports and real analyzer known-draft execution pass on both native runtimes. Approved full live gate is BLOCKED: bounded read-only `/api/ps` returned no running models. Zero completion POSTs, no warmup/load; live workflow/artifact/recovery remain untested. See the owning tracker for evidence and remaining runner qualification.
+
+- Fix Ollama endpoint selection: nonblank `OLLAMA_ENDPOINT` → `OLLAMA_HOST` → `http://localhost:11434/`, retaining existing Process/User/Machine resolution per name. Trim and normalize the trailing slash after selection; remove endpoint default environment writes.
+- Focused source-bound offline tests cover fallback, precedence, scopes and whitespace on Linux PowerShell 7 and native Windows 5.1/7. This is not full Ollama startup/model/inference acceptance; other existing model helpers can still persist settings. Version literals remain 3.10.4; final next version is not selected.
+
+- Forward optional positive Ollama output limits to `options.num_predict` and explicit nonstreaming `TimeoutSec`, preserving omitted defaults, positional API, other providers and automatic model retention. Native 5.1/7 bounds contracts pass 6/6 each; final relevant regressions pass. Source SHA256 `68BA2FEBB5183D9E0BD19AEC0DF1C4FF11428473711DF8E8F048FCEBC8A8BC46`.
+- Single native 5.1 original-adapter live smoke on smallest installed `qwen2.5:7b-instruct` (4,683,087,332 bytes), `num_predict=64`, `stream=false`, HTTP 60 s/supervisor 75 s, zero retry/redirect: timeout after 60.1806145 s; HTTP status/usage unknown. No warmup/download or repeat. Exact native Process/User model-setter readback and finally-restoration pass, full User hash preserved. This is not full Ollama workflow or successful live inference qualification; see [checkpoint](next-release-plan.md#bounded-adapter-limit-and-live-supplement).
 
 ## [3.10.4]
 

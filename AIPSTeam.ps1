@@ -159,8 +159,14 @@ param(
 
     [Parameter(HelpMessage = "Azure API protocol. Responses uses v1; ChatCompletions preserves PSAOAI compatibility.")]
     [ValidateSet('Responses', 'ChatCompletions')]
-    [string]$AzureAPIProtocol = 'Responses'
+    [string]$AzureAPIProtocol = 'Responses',
+
+    [Parameter(HelpMessage = "Optional Ollama nonstreaming HTTP timeout in seconds; omitted preserves transport defaults.")]
+    [ValidateRange(1,2147483647)]
+    [int]$TimeoutSec
 )
+$script:OllamaPublicTimeout = @{}
+if ($PSBoundParameters.ContainsKey('TimeoutSec')) { $script:OllamaPublicTimeout.TimeoutSec = $TimeoutSec }
 $script:AzureOptions = @{}
 if ($PSBoundParameters.ContainsKey('AzureReasoningModel')) { $script:AzureOptions.ReasoningModel = $AzureReasoningModel }
 if ($PSBoundParameters.ContainsKey('AzureEndpoint')) { $script:AzureOptions.Endpoint = $AzureEndpoint }
@@ -1208,6 +1214,10 @@ function Export-AndWritePowerShellCodeBlocks {
             if ($inFence) { $body += $line + "`n"; continue }
             if ($line -match '^\s*(?:#{1,6}\s+)?(?<title>(?:\d+\.\s+|[A-Za-z]).*?)\s*$') {
                 $title = $Matches.title.Trim().TrimEnd(':')
+                # Normalize only paired Markdown emphasis on the two numbered contract titles.
+                if ($title -match '^(?<number>[23])\.\s+(?<mark>\*\*|__|\*|_)(?<label>PowerShell Code|Usage Example)\k<mark>$') {
+                    $title = $Matches.number + '. ' + $Matches.label
+                }
                 if ($line -match '^\s*#{1,6}\s+' -or $title -match '^\d+\.\s+') {
                     $headers += $title; $section = $headers.Count - 1
                 }
@@ -1958,7 +1968,8 @@ function Invoke-LLMChatCompletion {
         [bool]$Stream,
         [string]$LogFolder,
         [string]$DeploymentChat,
-        [string]$ollamaModel
+        [string]$ollamaModel,
+        [ValidateRange(1,2147483647)][int]$TimeoutSec
     )
 
     try {
@@ -1987,7 +1998,11 @@ function Invoke-LLMChatCompletion {
                 # Verbose message for invoking Ollama model
                 Write-VerboseWrapper "Invoking Ollama model completion function."
                 # Invoke the Ollama model completion function
-                $response = Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
+                $ollamaBounds = @{}
+                if ($PSBoundParameters.ContainsKey('MaxTokens') -and $MaxTokens -gt 0) { $ollamaBounds.MaxTokens = $MaxTokens }
+                if ($PSBoundParameters.ContainsKey('TimeoutSec')) { $ollamaBounds.TimeoutSec = $TimeoutSec }
+                elseif ($script:OllamaPublicTimeout -and $script:OllamaPublicTimeout.ContainsKey('TimeoutSec')) { $ollamaBounds.TimeoutSec = $script:OllamaPublicTimeout.TimeoutSec }
+                $response = Invoke-AIPSTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream @ollamaBounds
                 return $response
             }
             "LMStudio" {
@@ -2341,13 +2356,19 @@ function Invoke-AIPSTeamOllamaCompletion {
         [double]$Temperature,
         [double]$TopP,
         [string]$ollamaModel,
-        [bool]$Stream
+        [bool]$Stream,
+        [ValidateRange(1,2147483647)][int]$MaxTokens,
+        [ValidateRange(1,2147483647)][int]$TimeoutSec
     )
 
     # Define options for the Ollama API call
     $ollamaOptions = [pscustomobject]@{
         temperature = $Temperature
         top_p       = $TopP
+    }
+
+    if ($PSBoundParameters.ContainsKey('MaxTokens')) {
+        $ollamaOptions | Add-Member -NotePropertyName num_predict -NotePropertyValue $MaxTokens
     }
 
     # Construct the JSON payload for the Ollama API request
@@ -2432,7 +2453,9 @@ function Invoke-AIPSTeamOllamaCompletion {
     }
     else {
         # Send a non-streaming HTTP POST request and parse the response
-        $response = Invoke-WebRequest -Method POST -Body $ollamaJson -Uri $url -UseBasicParsing
+        $ollamaTransportBounds = @{}
+        if ($PSBoundParameters.ContainsKey('TimeoutSec')) { $ollamaTransportBounds.TimeoutSec = $TimeoutSec }
+        $response = Invoke-WebRequest -Method POST -Body $ollamaJson -Uri $url -UseBasicParsing @ollamaTransportBounds
         $response = $response.Content | ConvertFrom-Json | Select-Object -ExpandProperty response
     }
 
@@ -3797,25 +3820,15 @@ if (-not $UserInput) {
 #region ollama
 if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
     $script:ollamaEndpoint = Get-EnvValue -Name 'OLLAMA_ENDPOINT'
+    if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) {
+        $script:ollamaEndpoint = Get-EnvValue -Name 'OLLAMA_HOST'
+    }
+    if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) {
+        $script:ollamaEndpoint = 'http://localhost:11434/'
+    }
+    $script:ollamaEndpoint = $script:ollamaEndpoint.Trim()
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
-    }
-
-    if ([string]::IsNullOrEmpty($script:ollamaEndpoint)) {
-        $defaultEndpoint = 'http://localhost:11434/'
-        try {
-            $script:ollamaEndpoint = $defaultEndpoint
-            $env:OLLAMA_ENDPOINT = $defaultEndpoint
-            [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', $defaultEndpoint, 'user')
-            if ([System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')) {
-                Write-Host "++ Environment variable 'OLLAMA_ENDPOINT' was set successfully ('$defaultEndpoint'). Set it manually if you need a non-default value: [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', '<your-ollama-api-endpoint>', 'user')" -ForegroundColor Green
-            }
-        }
-        # If setting the variable failed, display an error message
-        catch {
-            Write-Warning "-- Failed to set environment variable 'OLLAMA_ENDPOINT'."
-            return
-        } 
     }
 
     if (Test-OllamaAPI) {
@@ -3896,6 +3909,17 @@ if ($LoadProjectStatus) {
     try {
         # Load the project state from the specified file
         $GlobalState = Get-ProjectState -FilePath $LoadProjectStatus
+        # Resume uses the saved provider, but endpoints remain current environment configuration.
+        if ($GlobalState.LLMProvider -eq 'ollama') {
+            $script:ollamaEndpoint = Get-EnvValue -Name 'OLLAMA_ENDPOINT'
+            if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) {
+                $script:ollamaEndpoint = Get-EnvValue -Name 'OLLAMA_HOST'
+            }
+            if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) {
+                $script:ollamaEndpoint = 'http://localhost:11434/'
+            }
+            $script:ollamaEndpoint = $script:ollamaEndpoint.Trim().TrimEnd('/') + '/'
+        }
         Write-Information "++ Project state loaded successfully from $LoadProjectStatus" -InformationAction Continue
         Write-AIPSTeamActiveProvider
         # Output verbose information about the loaded project state

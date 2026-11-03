@@ -16,7 +16,7 @@ function Get-Module {param([switch]$ListAvailable,$Name);[pscustomobject]@{Name=
 function Import-Module {param($Name,$ErrorAction)}
 function Invoke-ScriptAnalyzer {param($Path,$ScriptDefinition,$Severity,$ErrorAction);$script:analyzerCalls++;if($script:mode -eq 'throw'){throw 'FIXTURE_ANALYZER_FAILURE'};if($script:mode -eq 'findings'){[pscustomobject]@{Line=1;Message='fixture diagnostic';RuleName='FixtureRule'}}}
 $rows=@()
-foreach($id in @('no-code','empty-block','invalid-code','valid-code','analyzer-zero','analyzer-findings','analyzer-throw','captured-main','multiple-main','ambiguous-blocks','duplicate-main','unknown-section','noncode-fence')){
+foreach($id in @('no-code','empty-block','invalid-code','valid-code','analyzer-zero','analyzer-findings','analyzer-throw','captured-main','multiple-main','ambiguous-blocks','duplicate-main','unknown-section','noncode-fence','captured-bold','bold-helper','emphasis-case','fenced-heading','usage-only','bold-ambiguous','test-subsection')){
  $dir=Join-Path $EvidenceRoot $id;New-Item -ItemType Directory $dir|Out-Null
  $GlobalState=[pscustomobject]@{TeamDiscussionDataFolder=$dir;lastPSDevCode="Write-Output 'prior never executed'";FileVersion=1;GlobalPSDevResponse='';GlobalResponse='';GlobalResponses=@();NOLog=$false}
  $prior=$GlobalState.lastPSDevCode;$checks=@();$caught=$null;$analyzerCalls=0;$mode=$id.Replace('analyzer-','')
@@ -36,12 +36,21 @@ foreach($id in @('no-code','empty-block','invalid-code','valid-code','analyzer-z
    'ambiguous-blocks' {$reply=$main}
    'duplicate-main' {$reply="## 2. PowerShell Code`n$main`n## 2. PowerShell Code`n$main`n## 3. Usage Example"}
    'unknown-section' {$reply="## Other Code`n$main"}
+   'captured-bold' {$fixturePath=Join-Path $PSScriptRoot 'fixtures/DeveloperResponse-ollama-bold-headings.txt';if((Get-FileHash $fixturePath).Hash -ne '6720b4d4f6a5ba71b9d0b63523a5cfde5acadb6681ba877b08ba78aeaafd9854'){throw 'FIXTURE_DRIFT'};$reply=[IO.File]::ReadAllText($fixturePath)}
+   'bold-helper' {$reply="2. **PowerShell Code**`n$main`n3. **Usage Example**`n$fence`n.\usage.ps1`n$end"}
+   'emphasis-case' {$reply="2. _pOwErShElL cOdE_`n$fence`nWrite-Output 'OK'`n$end`n3. __uSaGe ExAmPlE__"}
+   'fenced-heading' {$reply="2. **PowerShell Code**`n$fence`n# 3. **Usage Example**`nWrite-Output 'OK'`n$end`n3. **Usage Example**"}
+   'usage-only' {$reply="3. **Usage Example**`n$fence`nWrite-Output 'usage'`n$end"}
+   'bold-ambiguous' {$reply="2. **PowerShell Code**`n$main`n2. **PowerShell Code**`n$main`n3. **Usage Example**"}
+   'test-subsection' {$reply="2. **PowerShell Code**`n$fence`nWrite-Output 'OK'`n$end`n### Tests`n$fence`nWrite-Output 'test'`n$end`n3. **Usage Example**"}
    'noncode-fence' {$reply='```text'+"`n$fence`nWrite-Output 'not code'`n$end`n"+'```'}
   }
   Save-AndUpdateCode $reply $GlobalState
   if($id -eq 'captured-main'){$checks+=($GlobalState.lastPSDevCode.Contains('Get-NetTCPConnection -State Listen |'));$checks+=($GlobalState.lastPSDevCode.Contains('Select-Object -Property LocalAddress, LocalPort, State'));$checks+=(-not $GlobalState.lastPSDevCode.Contains('.\LocalTcpListenerSnapshot.ps1'))}
   if($id -eq 'multiple-main'){$checks+=($GlobalState.lastPSDevCode.Contains("function Get-FixtureHelper { 'helper' }"));$checks+=($GlobalState.lastPSDevCode -match '(?m)^ Get-FixtureHelper');$checks+=(-not $GlobalState.lastPSDevCode.Contains('.\usage.ps1'))}
-  if($id -in @('valid-code','captured-main','multiple-main')){$checks+=($GlobalState.DraftOutcome -eq 'Complete');$checks+=($GlobalState.FileVersion -eq 2)}
+  if($id -in @('captured-bold','emphasis-case','fenced-heading')){$checks+=($GlobalState.lastPSDevCode.Contains("Write-Output 'OK'"));$checks+=(-not $GlobalState.lastPSDevCode.Contains('Invoke-Expression'));$checks+=(-not $GlobalState.lastPSDevCode.Contains('.\SimpleOKScript.ps1'))}
+  if($id -eq 'bold-helper'){$checks+=($GlobalState.lastPSDevCode.Contains('function Get-FixtureHelper'));$checks+=(-not $GlobalState.lastPSDevCode.Contains('.\usage.ps1'))}
+  if($id -in @('valid-code','captured-main','multiple-main','captured-bold','bold-helper','emphasis-case','fenced-heading')){$checks+=($GlobalState.DraftOutcome -eq 'Complete');$checks+=($GlobalState.FileVersion -eq 2)}
   else{$checks+=($GlobalState.DraftOutcome -eq 'Incomplete');$checks+=($GlobalState.lastPSDevCode -ceq $prior);$checks+=($GlobalState.FileVersion -eq 1);$checks+=(@(Get-ChildItem $dir -File).Count -eq 0)}
  }
  $p=Join-Path $dir 'state.xml';$saved=Save-ProjectState $p $GlobalState;$checks+=($saved -ceq $true);$loaded=Import-Clixml $p;$checks+=($loaded.lastPSDevCode -ceq $GlobalState.lastPSDevCode)
