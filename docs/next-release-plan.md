@@ -1,10 +1,10 @@
 # AIPSTeam — proposal for the next Gallery release
 
-## Current owner decision — UNRELEASED BACKLOG delivered to GitHub, release work paused
+## Current owner decision — planned 3.10.5, UNRELEASED; documentation preparation only
 
-All current qualified changes are **offline-qualified UNRELEASED BACKLOG delivered to GitHub**, intended for a future version, not released on PowerShell Gallery. This decision supersedes earlier active/next-gate wording below; historical qualification receipts and limitations are preserved. Actual version remains **3.10.4**; no next version is chosen, and proposed **3.10.5 is not approved**. Final offline qualification remains bound to source SHA256 `E325D1EB5A373F0E00DA3DF25AD1C926CF688549FF2ADFE92F4A752FB2B481C5`.
+All current qualified changes are **offline-qualified UNRELEASED BACKLOG delivered to GitHub**, intended for a future version, not released on PowerShell Gallery. This decision supersedes earlier active/next-gate wording below; historical qualification receipts and limitations are preserved. The owner selected **3.10.5** as the planned **UNRELEASED** version. Source version metadata remains **3.10.4**; this is not a version bump or Gallery publication. Final offline qualification remains bound to source SHA256 `E325D1EB5A373F0E00DA3DF25AD1C926CF688549FF2ADFE92F4A752FB2B481C5`.
 
-The owner approved scoped commit/push of the qualified backlog and this repository indication. This supersedes the earlier delivery prohibition only; historical no-publication qualification receipts remain unchanged. No release packaging, version bump, CI changes, live calls, installation, owner-checkout synchronization or PowerShell Gallery publication is authorized. Release work remains paused; no issue closure is implied.
+The owner approved scoped commit/push of the qualified backlog and this repository indication. This supersedes the earlier delivery prohibition only; historical no-publication qualification receipts remain unchanged. No release packaging, version bump, CI changes, live calls, installation, owner-checkout synchronization or PowerShell Gallery publication is authorized. Only local documentation preparation for planned 3.10.5 is now authorized; prior commit/push approval was already executed and does not authorize another delivery. No issue closure is implied.
 
 Live limitation: the original Ollama full live workflow persisted `DraftOutcome=Incomplete` and failed exporter admission. The heading compatibility repair and retained-response workflow/recovery passed offline only; the historical live failure is not retrospectively repaired, and current bytes have no fresh live qualification. Previous publication/handoff bindings remain superseded.
 
@@ -12,7 +12,9 @@ Live limitation: the original Ollama full live workflow persisted `DraftOutcome=
 
 Status at initial discovery: R0 discovery and R1 encoding/parser regression completed under approval; remaining slices were proposals. Further implementation, dependency installation, CI changes, live provider calls, commits, push and publication required separate approval.
 
-## Active next-release checkpoint — bounded Ollama endpoint fix
+<a id="active-next-release-checkpoint--bounded-ollama-endpoint-fix"></a>
+
+## Historical next-release checkpoint — bounded Ollama endpoint fix
 
 This checkpoint supersedes old proposal/status wording only for the new local slice; historical receipts below are unchanged. Approved scope: operational tracker, source endpoint fix, focused tests and relevant documentation. Baseline `aff49d17490e7f97c1f3b187252816250a03ec5d`, initially clean. Current source version remains 3.10.4; next version is provisional/unselected (the historical 3.10.4 proposal is not a new version decision).
 

@@ -1,6 +1,6 @@
 # AI PowerShell Team (AIPSTeam) 3.10.4
 
-> **Unreleased next-version work:** this GitHub source includes offline-qualified backlog delivered to the repository, not a PowerShell Gallery release. Script version remains **3.10.4**; the next version is not selected. Current bytes are not freshly live-qualified.
+> **Planned 3.10.5 — UNRELEASED:** this GitHub source includes offline-qualified changes intended for 3.10.5, not a new PowerShell Gallery release. Script metadata remains **3.10.4**. Current bytes are not freshly live-qualified; Gallery availability was not rechecked for this documentation-only preparation.
 
 AIPSTeam helps PowerShell builders and automation engineers turn a project description or existing script into a draft. It simulates a team that can propose requirements, code, documentation and review feedback using Azure OpenAI, Ollama, LM Studio or llama.cpp.
 
